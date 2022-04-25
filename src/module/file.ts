@@ -10,10 +10,11 @@ function get_file_type(mime:string){
 
 export async function writefile(res:ServerResponse,pathname:string,range:string|undefined){
     try {
-        console.log('writefile1')
+        // console.log('writefile1',pathname)
         if(!existsSync(pathname)) throw('404 file not in server')
-        console.log('writefile2')
+        // console.log('writefile2')
         const stats = statSync(pathname)
+        if(stats.isDirectory()) throw('404 this is directory, can not streaming ')
 
         // const file_name = pathname.split('/').splice(-1)[0]
         const mime = pathname.split('.').splice(-1)[0]

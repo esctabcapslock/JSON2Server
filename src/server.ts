@@ -1,7 +1,7 @@
 export const setting = {
     files:{
         __dir:"./public/",
-        __allow:["./index.html"],
+        __allow:["./index.html","./*.gif"],
         __disallow:["./real"],
         __access:"all",
         static:{
@@ -18,9 +18,10 @@ export const setting = {
                 // <p><a href="./123">123</a><a href="456">456</a><a href="/789">789</a></p>
                 // 각각 localhost/aa/bb/123, localhost/aa/bb/456, localhost/789 설정!
 
-
-
             }
+        },
+        img:{
+            __allow:['*.jpg','*.jpeg','*.png']
         },
         "":{
             __isdirectory:false,
@@ -54,13 +55,11 @@ export const setting = {
         "__path":"./log.dat"
     },
     access:{
-        __type:"cookie",
+        __type:"digest",
         __list:{
             "user":"",
             "admin":""
-
         }
-
     },
     port:80,
 

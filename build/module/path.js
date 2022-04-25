@@ -1,5 +1,15 @@
 "use strict";
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
 Object.defineProperty(exports, "__esModule", { value: true });
+const digest_1 = require("../tool/digest");
 function create_path_dict() {
     const out = {
         __isdirectory: true,
@@ -36,6 +46,9 @@ function remove_high_dir(path) {
 class Path {
     constructor() {
         this.path_dict = create_path_dict();
+        this.path_dict.__type = 'file';
+        this.digest = new digest_1.Digest('/', () => '1234');
+        this.assess = null;
     }
     application_path(pathname, isallow, type = undefined, access = undefined) {
         const path_arr = parse_pathname(pathname).split('/');
@@ -76,6 +89,9 @@ class Path {
         if (setting.db) {
         }
         if (setting.api) {
+        }
+        if (setting.access) {
+            this.assess = setting.access.__type;
         }
         if (setting.files) {
             const roots = [{ dir: setting.files, root: this.path_dict }];
@@ -123,90 +139,100 @@ class Path {
         }
         // console.log('[parse_setting_json] this.path_dict>',this.path_dict)
     }
-    parse(req, pathname) {
-        // 인증 관련 처리
-        const access = 'all';
-        const path_arr = parse_pathname(pathname).split('/');
-        if (path_arr.some(v => v.startsWith('__')))
-            throw ('400 폴더 중 __으로 시작하는게 있음');
-        const file_name = path_arr.pop();
-        if (file_name == undefined)
-            throw ('400 [application_path] does not file_name exist');
-        let root = this.path_dict;
-        let filepath = parse_pathname(this.path_dict.__dir ? this.path_dict.__dir : ''); //파일이 저장된 위치
-        let notdirin = false;
-        let type = undefined;
-        for (const dir of path_arr) {
-            console.log('[parse] for(const dir of path_arr)', { dir, filepath, notdirin, type, path_arr, root });
-            if (notdirin) {
-                filepath += '/' + dir;
-                continue;
+    parse(req, res, pathname) {
+        return __awaiter(this, void 0, void 0, function* () {
+            // 인증 관련 처리
+            let auth = true;
+            if (this.assess == 'digest') {
+                auth = yield this.digest.server(req, res);
+                if (!auth)
+                    return { type: 'none', todo: '' };
             }
-            if (dir.startsWith('__'))
+            const access = auth ? 'all' : '';
+            const path_arr = parse_pathname(pathname).split('/');
+            if (path_arr.some(v => v.startsWith('__')))
+                throw ('400 폴더 중 __으로 시작하는게 있음');
+            const file_name = path_arr.pop();
+            if (file_name == undefined)
+                throw ('400 [application_path] does not file_name exist');
+            let root = this.path_dict;
+            let filepath = parse_pathname(this.path_dict.__dir ? this.path_dict.__dir : ''); //파일이 저장된 위치
+            let notdirin = false;
+            let type = this.path_dict.__type;
+            for (const dir of path_arr) {
+                console.log('[parse] for(const dir of path_arr)', { dir, filepath, notdirin, type, path_arr });
+                if (notdirin) {
+                    filepath += '/' + dir;
+                    continue;
+                }
+                if (dir.startsWith('__'))
+                    throw ('400 잘못된 경로입니다');
+                if (root.__disallow.map(v => RegExp(`^${parse_pathname(v).replace(/\*/gi, '(.*)')}$`)).some(v => v.test(dir)))
+                    throw ('404 [error] 존재하지 않는 접근' + dir + root.__disallow);
+                if (root.__allow.includes(access))
+                    throw ('403 [errror] 접근 권한이 없습니다.');
+                if (root[dir]) {
+                    const tmp = root[dir];
+                    if (!tmp.__isdirectory)
+                        throw ('404 해당 경로는 폴더가 아님');
+                    else {
+                        if (tmp.__dir) {
+                            if (tmp.__dir.startsWith('/'))
+                                filepath = tmp.__dir;
+                            else
+                                filepath = filepath + '/' + parse_pathname(tmp.__dir); //remove_high_dir(
+                        }
+                        else
+                            filepath += '/' + dir;
+                        if (tmp.__type)
+                            type = tmp.__type;
+                    }
+                    root = tmp;
+                }
+                else {
+                    if (root.__allow.map(v => RegExp(`^${parse_pathname(v).replace(/\*/gi, '(.*)')}$`)).some(v => v.test(dir))) {
+                        notdirin = true;
+                        filepath += '/' + dir;
+                    }
+                }
+            }
+            // console.log('[pause] dir',{file_name, filepath, notdirin,type})
+            // 파일 관련
+            if (file_name.startsWith('__'))
                 throw ('400 잘못된 경로입니다');
-            if (root.__disallow.map(v => RegExp(`^${parse_pathname(v).replace(/\*/gi, '(.*)')}$`)).some(v => v.test(dir)))
-                throw ('404 [error] 존재하지 않는 접근' + dir + root.__disallow);
-            if (root.__allow.includes(access))
-                throw ('403 [errror] 접근 권한이 없습니다.');
-            if (root[dir]) {
-                const tmp = root[dir];
-                if (!tmp.__isdirectory)
-                    throw ('404 해당 경로는 폴더가 아님');
+            if (root.__disallow.map(v => RegExp(`^${parse_pathname(v).replace(/\*/gi, '(.*)')}$`)).some(v => v.test(file_name)))
+                throw ('404 [error] 존재하지 않는 접근' + file_name + root.__disallow);
+            if (root[file_name]) {
+                const tmp = root[file_name];
+                if (tmp.__isdirectory)
+                    throw ('404 해당 경로에 파일이 없음1');
                 else {
                     if (tmp.__dir) {
                         if (tmp.__dir.startsWith('/'))
                             filepath = tmp.__dir;
                         else
-                            filepath = filepath + '/' + parse_pathname(tmp.__dir); //remove_high_dir(
+                            filepath += '/' + parse_pathname(tmp.__dir);
                     }
                     else
-                        filepath += '/' + dir;
+                        filepath += '/' + parse_pathname(file_name);
                     if (tmp.__type)
                         type = tmp.__type;
                 }
-                root = tmp;
             }
-            else {
-                if (root.__allow.map(v => RegExp(`^${parse_pathname(v).replace(/\*/gi, '(.*)')}$`)).some(v => v.test(dir))) {
-                    notdirin = true;
-                    filepath += '/' + dir;
-                }
+            else if (root.__allow.map(v => RegExp(`^${parse_pathname(v).replace(/\*/gi, '(.*)')}$`)).some(v => v.test(file_name))) {
+                notdirin = true;
             }
-        }
-        console.log('[pause] dir', { file_name, filepath, notdirin, type });
-        // 파일 관련
-        if (file_name.startsWith('__'))
-            throw ('400 잘못된 경로입니다');
-        if (root.__disallow.map(v => RegExp(`^${parse_pathname(v).replace(/\*/gi, '(.*)')}$`)).some(v => v.test(file_name)))
-            throw ('404 [error] 존재하지 않는 접근' + file_name + root.__disallow);
-        if (root[file_name]) {
-            const tmp = root[file_name];
-            if (tmp.__isdirectory)
-                throw ('404 해당 경로에 파일이 없음1');
-            else {
-                if (tmp.__dir) {
-                    if (tmp.__dir.startsWith('/'))
-                        filepath = tmp.__dir;
-                    else
-                        filepath += '/' + parse_pathname(tmp.__dir);
-                }
-                else
-                    filepath += '/' + parse_pathname(file_name);
-                if (tmp.__type)
-                    type = tmp.__type;
-            }
-        }
-        else if (root.__allow.map(v => RegExp(`^${parse_pathname(v).replace(/\*/gi, '(.*)')}$`)).some(v => v.test(file_name))) {
-            notdirin = true;
-        }
-        if (notdirin)
-            filepath += '/' + file_name;
-        if (!type)
-            throw ('404 error: type 없음');
-        console.log('[parse] {type:type, todo:filepath}', { type: type, todo: filepath });
-        return { type: type, todo: filepath };
-        //
-        throw new Error('불가능한 경로 요청됨');
+            else
+                throw ('404 해당 경로에 파일이 없음3');
+            if (notdirin)
+                filepath += '/' + file_name;
+            if (!type)
+                throw ('404 error: type 없음');
+            console.log('[parse] {type:type, todo:filepath}', { type: type, todo: filepath });
+            return { type: type, todo: filepath };
+            //
+            // throw new Error('불가능한 경로 요청됨')
+        });
     }
     logging() {
     }

@@ -21,11 +21,13 @@ function get_file_type(mime) {
 function writefile(res, pathname, range) {
     return __awaiter(this, void 0, void 0, function* () {
         try {
-            console.log('writefile1');
+            // console.log('writefile1',pathname)
             if (!(0, fs_1.existsSync)(pathname))
                 throw ('404 file not in server');
-            console.log('writefile2');
+            // console.log('writefile2')
             const stats = (0, fs_1.statSync)(pathname);
+            if (stats.isDirectory())
+                throw ('404 this is directory, can not streaming ');
             // const file_name = pathname.split('/').splice(-1)[0]
             const mime = pathname.split('.').splice(-1)[0];
             const parts = range == undefined ? undefined : range.replace(/bytes=/, "").replace(/\/([0-9|*]+)$/, '').split("-").map(v => parseInt(v));

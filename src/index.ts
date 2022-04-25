@@ -20,7 +20,7 @@ const {port} = setting;
             const url = new URL(req.url, `http://${req.headers.host}`);
             // console.log(url,req.headers.host)
 
-            const {type, todo} = path.parse(req,url.pathname)
+            const {type, todo} = await path.parse(req,res,decodeURI(url.pathname))
 
             if (type=='file'){
                 await writefile(res,todo,req.headers.range);

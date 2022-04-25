@@ -1,4 +1,5 @@
-import {IncomingMessage} from "http"
+import {IncomingMessage,ServerResponse} from "http"
+import { Digest } from "../tool/digest"
 
 type path_dict = {
     __allow:string[];
@@ -54,9 +55,14 @@ function remove_high_dir(path:string){
 
 export default class Path{
     path_dict:path_dict
+    digest:Digest
+    assess:null|string
     
     constructor(){
         this.path_dict = create_path_dict()
+        this.path_dict.__type = 'file'
+        this.digest = new Digest('/',()=>'1234')
+        this.assess = null
     }
     private application_path(pathname:string,isallow:boolean,type:string|undefined=undefined,access:string|undefined=undefined){
         const path_arr = parse_pathname(pathname).split('/')
@@ -90,6 +96,8 @@ export default class Path{
 
         }if(setting.api){
 
+        }if(setting.access){
+            this.assess = setting.access.__type
         }if(setting.files){
             const roots:{dir:any;root:any}[] = [{dir:setting.files,root:this.path_dict}]
             while (roots.length){ //주어진 입력이 정상적인지 확인하기 위해(?) 이 과정을 거침
@@ -108,9 +116,6 @@ export default class Path{
                 for(const key in dir){
                     if(typeof key=='string' && !key.startsWith('__')){
                         // console.log('[while]',key)
-
-
-
                         if(typeof dir[key] != 'object') throw('root[key] 절못된 값이다.')
                         if(typeof dir[key].__isdirectory!='boolean') dir[key].__isdirectory = true
                         if(dir[key].__isdirectory){if(!root[key]) root[key] = create_path_dict();}
@@ -125,11 +130,18 @@ export default class Path{
 
         // console.log('[parse_setting_json] this.path_dict>',this.path_dict)
     }
-    public parse(req:IncomingMessage,pathname:string):{type:string,todo:string}{
+    public async parse(req:IncomingMessage,res:ServerResponse,pathname:string):Promise<{ type: string; todo: string; }>{
 
         // 인증 관련 처리
+        let auth = true
 
-        const access = 'all'
+        if(this.assess=='digest'){
+            auth =  await this.digest.server(req,res)
+            if(!auth) return {type:'none', todo:''}
+        }
+
+
+        const access = auth?'all':''
 
 
         const path_arr = parse_pathname(pathname).split('/')
@@ -140,10 +152,10 @@ export default class Path{
         let root = this.path_dict
         let filepath = parse_pathname(this.path_dict.__dir?this.path_dict.__dir:'') //파일이 저장된 위치
         let notdirin = false
-        let type = undefined
+        let type = this.path_dict.__type
 
         for(const dir of path_arr){
-            console.log('[parse] for(const dir of path_arr)',{dir, filepath, notdirin,type,path_arr,root})
+            console.log('[parse] for(const dir of path_arr)',{dir, filepath, notdirin,type,path_arr})
             if(notdirin){filepath += '/'+dir; continue;}
 
             if(dir.startsWith('__')) throw('400 잘못된 경로입니다')
@@ -171,7 +183,7 @@ export default class Path{
             }
         }
 
-        console.log('[pause] dir',{file_name, filepath, notdirin,type})
+        // console.log('[pause] dir',{file_name, filepath, notdirin,type})
         // 파일 관련
         if(file_name.startsWith('__')) throw('400 잘못된 경로입니다')
         if (root.__disallow.map(v=>RegExp(`^${parse_pathname(v).replace(/\*/gi,'(.*)')}$`)).some(v=>v.test(file_name))) throw('404 [error] 존재하지 않는 접근'+file_name+root.__disallow)
@@ -189,7 +201,7 @@ export default class Path{
                 }
         }else if(root.__allow.map(v=>RegExp(`^${parse_pathname(v).replace(/\*/gi,'(.*)')}$`)).some(v=>v.test(file_name))){
             notdirin = true;
-        }
+        }else throw('404 해당 경로에 파일이 없음3');
         if(notdirin) filepath += '/'+file_name;
         if(!type) throw('404 error: type 없음')
 
@@ -198,9 +210,7 @@ export default class Path{
         return {type:type, todo:filepath}
 
         //
-
-
-        throw new Error('불가능한 경로 요청됨')
+        // throw new Error('불가능한 경로 요청됨')
 
     }
 

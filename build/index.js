@@ -31,7 +31,7 @@ const { port } = server_1.setting;
                     throw ("host가 undefined");
                 const url = new URL(req.url, `http://${req.headers.host}`);
                 // console.log(url,req.headers.host)
-                const { type, todo } = path.parse(req, url.pathname);
+                const { type, todo } = yield path.parse(req, res, decodeURI(url.pathname));
                 if (type == 'file') {
                     yield (0, file_1.writefile)(res, todo, req.headers.range);
                 }
