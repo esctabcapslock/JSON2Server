@@ -1,0 +1,26 @@
+{
+  "name": "json2server",
+  "version": "1.0.0",
+  "description": "JSON 문법으로 간단한 웹 서비스 만들기",
+  "main": "main.ts",
+  "scripts": {
+    "test": "index.js",
+    "start": "node main.ts",
+    "dev":"ts-node src"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/esctabcapslock/JSON2Server.git"
+  },
+  "author": "esctabcapslock",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/esctabcapslock/JSON2Server/issues"
+  },
+  "homepage": "https://github.com/esctabcapslock/JSON2Server#readme",
+  "devDependencies": {
+    "@types/node": "^17.0.26",
+    "ts-node": "^10.7.0",
+    "typescript": "^4.6.3"
+  }
+}
