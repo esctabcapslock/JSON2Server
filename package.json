@@ -6,7 +6,8 @@
   "scripts": {
     "test": "index.js",
     "start": "node main.ts",
-    "dev": "ts-node src"
+    "dev": "ts-node src",
+    "dev-db": "ts-node src/module/mdbms.ts"
   },
   "repository": {
     "type": "git",

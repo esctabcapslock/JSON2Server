@@ -57,12 +57,14 @@ export default class Path{
     path_dict:path_dict
     digest:Digest
     assess:null|string
+    user_list:{user_agent:string,cookies:string,settime:number}[]
     
     constructor(){
         this.path_dict = create_path_dict()
         this.path_dict.__type = 'file'
         this.digest = new Digest('/',()=>'1234')
         this.assess = null
+        this.user_list = []
     }
     private application_path(pathname:string,isallow:boolean,type:string|undefined=undefined,access:string|undefined=undefined){
         const path_arr = parse_pathname(pathname).split('/')

@@ -39,7 +39,28 @@ export const setting = {
     },db:{
         // db 읽고 쓰는건 자동으로. 파일 스팸차단 이런건 여기 달 수 있게끔
         __type:"SQLite",
-        __path:"./db"
+        __path:"./db",
+        db1:{ //파일 이름 1
+            students:{ //테이블 이름
+                __access:['all','all','all','all'],//읽고, 추가. 수정. 삭제.
+                name:{ //변수 속성
+                    __type:"string",
+                    __promarykey:false,
+                    __autucount:true,
+                    __notnull:true,
+                    __access:['all','all','all','all'],//읽고, 추가. 수정. 삭제.
+                },date:{
+                    __type:"int",
+                    __promarykey:false,
+                    __autucount:true,
+                    __notnull:true,
+                }
+            }
+            
+        },
+        db2:{
+
+        }
     },firetype:{ //파일 타입 등등
         mapval:{
             name:"string|undfined",
