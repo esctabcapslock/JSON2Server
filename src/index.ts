@@ -2,12 +2,14 @@ import {setting} from './server'
 import Path from "./module/path"
 import {writefile} from "./module/file"
 import { createServer,IncomingMessage,ServerResponse } from 'http'
+import { MBDMS } from './module/mdbms';
 const {port} = setting;
 // console.log('[setting]',setting);
 
 (async function main (){
     
     const path = new Path()
+    const mdbms = new MBDMS(setting)
     path.parse_setting_json(setting)
 
     // db에 
@@ -17,22 +19,24 @@ const {port} = setting;
             if(req.url==undefined) throw("url이 undefined")
             if(req.headers.host==undefined) throw("host가 undefined")
 
-            const url = new URL(req.url, `http://${req.headers.host}`);
+            
             // console.log(url,req.headers.host)
 
-            const {type, todo} = await path.parse(req,res,decodeURI(url.pathname))
+            const {type, todo} = await path.parse(req,res)
 
             if (type=='file'){
-                await writefile(res,todo,req.headers.range);
+                await writefile(res,todo as string,req.headers.range);
             }
             else if (type=='db'){
-                res.end('1')
+                const _todo = todo as {method:string,file:string,table:string,attribute:string,option:{[key:string]:string}}
+                await mdbms.parsehttp(res,_todo.method,_todo.file,_todo.table,_todo.attribute,_todo.option)
+                
             }else if (type=='api'){
                 res.end('1')
             }else{throw('알 수 없는 type 오류')}
         
         }catch(e){
-            console.log('[error]',e)
+            console.log('[error-]',e)
 
             const code_tmp = String(e).match(/\d+/,)
             if(code_tmp) res.statusCode = Number(code_tmp[0])

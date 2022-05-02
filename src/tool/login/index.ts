@@ -2,7 +2,6 @@ var fs = require('fs');
 import {createCipheriv,createDecipheriv,createHash} from 'crypto';
 import {IncomingMessage,ServerResponse} from "http"
 import {readFileSync,writeFileSync} from 'fs';
-import { rejects } from 'assert';
 const URL = require('url')
 console.log('process.cwd()',process.cwd(), __dirname)
 

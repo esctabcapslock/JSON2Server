@@ -3,7 +3,7 @@ import {createReadStream, statSync, existsSync} from "fs"
 
 
 function get_file_type(mime:string){
-    if (['txt','css','js','ts','html'].includes(mime)){
+    if (['txt','css','js','ts','html','json'].includes(mime)){
         return `text/${mime=='txt'?'plain':mime.replace('js','javascript')}; charset=utf-8`;
     }else return 'application'
 }

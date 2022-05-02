@@ -1,57 +1,8 @@
 import {IncomingMessage,ServerResponse} from "http"
 import { Digest } from "../tool/digest"
+import {parse_pathname,is_string_array} from './sort_functions'
+import {path_dict,file_dict,create_path_dict,create_file_dict} from './path_type'
 
-type path_dict = {
-    __allow:string[];
-    __disallow:string[];
-    __isdirectory:boolean;
-    __access:string|undefined;
-    __dir:string|undefined;
-    __type:string|undefined;
-    [key:string]:string|path_dict|file_dict|string[]|boolean|undefined;
-}
-type file_dict = {
-    __isdirectory:boolean;
-    __access:string|undefined;
-    __dir:string|undefined;
-    __type:string|undefined;
-    [key:string]:string|boolean|undefined;
-}
-function create_path_dict():path_dict{
-    const out:path_dict = {
-        __isdirectory:true,
-        __allow:[],
-        __disallow:[],
-        __type:'file',
-        __access:undefined,
-        __dir:undefined,
-    }
-    return out
-}
-function create_file_dict():file_dict{
-    const out:file_dict = {
-        __isdirectory:false,
-        __type:'file',
-        __access:undefined,
-        __dir:undefined,
-    }
-    return out
-}
-
-function is_string_array(obj:any){
-    if(!Array.isArray(obj)) return false
-    return obj.every(v=>typeof v=='string')
-}
-
-function parse_pathname(path:string){
-    return path.replace(/^(\.?)\//,'').replace(/\/$/,'')
-}
-
-function remove_high_dir(path:string){
-    const ar = parse_pathname(path).split('/')
-    ar.pop()
-    return ar.join('/');
-}
 
 export default class Path{
     path_dict:path_dict
@@ -132,9 +83,13 @@ export default class Path{
 
         // console.log('[parse_setting_json] this.path_dict>',this.path_dict)
     }
-    public async parse(req:IncomingMessage,res:ServerResponse,pathname:string):Promise<{ type: string; todo: string; }>{
+    public async parse(req:IncomingMessage,res:ServerResponse):Promise<{ type: string; todo: string|{[key:string]:any|string}; }>{
+        const url = new URL(req.url?req.url:'', `http://${req.headers.host}`);
+        const pathname = decodeURI(url.pathname)
 
-        // 인증 관련 처리
+        //길이가 이상하거나, 하는 등 유효겅 검사 코드 추가 필요
+
+        // 인증 관련 처리 -> 모듈화할것
         let auth = true
 
         if(this.assess=='digest'){
