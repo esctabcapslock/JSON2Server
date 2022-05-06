@@ -1,9 +1,8 @@
 import {IncomingMessage,ServerResponse } from 'http'
 // import * as sqlite3 from 'sqlite3'
 import {sqlite3} from 'sqlite3'
-import {parse_connect_pathname} from './sort_functions'
+import {parse_connect_pathname,createpath} from './sort_functions'
 import {dbsetting,dbfile,dbtable,dbattribute,create_dbfile,create_dbtable,create_dbattribute} from './mdbms_type'
-
 
 export class MBDMS{//Management System for DataBase Management System
     
@@ -18,17 +17,24 @@ export class MBDMS{//Management System for DataBase Management System
         this.__path = __path
         this.__dir = __dir
         this.dbmses = {}
+        createpath(this.__dir)
+        
 
         for (const key in setting){
-            if (key.startsWith('__') && !['__path','__dir'].includes(key)) throw('[parsesetting], key없음 '+key)
+            if (key.startsWith('__')){
+                if(!['__path','__dir'].includes(key)) throw('[parsesetting], key없음 '+key)
+                else continue
+            }
             const file = setting[key] as dbfile
             if(typeof file.__type != 'string') throw('[__tpye string 아님') 
             const __type = file.__type.toLocaleLowerCase()
-            if(__type=='sqlite'){
+            if(__type=='sqlite'||__type=='sqlite3'){
                 this.dbmses[key] = new DBMS_SQLite(key,__path,__dir, file)
             
             }else throw('이상한 type')
         }
+
+    
         
 
         // this.settime = setting
@@ -92,9 +98,9 @@ export class MBDMS{//Management System for DataBase Management System
 }
 
 class MDBMS_DB{
-    private file:dbfile;
-    private __path: string;
-    private __dir: string;
+    protected file:dbfile;
+    protected __path: string;
+    protected __dir: string;
     public parsesetting(file:dbfile){
 
         function check___access(tmp:any){
@@ -116,20 +122,26 @@ class MDBMS_DB{
             // this.settime[key] = _cfile
             const _cfile = this.file
             for(const key_table in file){//__name:string,__access
-                if (key_table.startsWith('__') && !['__name','__access'].includes(key_table)) throw('[parsesetting], tablename key없음 '+key_table)
+                if (key_table.startsWith('__')){
+                    if(!['__access','__type','__path','__name','__dir'].includes(key_table)) throw('[parsesetting], tablename key없음 '+key_table)
+                    else continue
+                }
                 const _talbe = file[key_table] as dbtable
-                if (typeof _talbe != 'object') throw('[parsesetting _talbe] 잘못된 객체');
+                if (typeof _talbe != 'object') throw('[parsesetting _talbe] 잘못된 객체'+_talbe);
                 if(!check___access(_talbe.__access)) throw('[parsesetting check___access] 잘못된 객체');
                 const _ctalbe = create_dbtable(key_table, _talbe.__access)
                 _cfile[key_table] = _ctalbe
                 for (const key_attribute in _talbe){
-                    if (key_attribute.startsWith('__') && !['__name','__access','__type'].includes(key_attribute)) throw('[parsesetting], tablename key없음 '+key_attribute)
+                    if (key_attribute.startsWith('__')){
+                        if(!['__primarykey','__autoincrement','__notnull'].includes(key_attribute)) throw('[parsesetting], key_attribute key없음 '+key_attribute)
+                        else continue
+                    }
                     const _attribute = _talbe[key_attribute] as dbattribute
                     if (typeof _attribute != 'object') throw('[parsesetting _attribute] 잘못된 객체');
-                    if (typeof _attribute.__name != 'string') throw('[parsesetting _attribute.__name] 잘못된 값');
+                    if (typeof _attribute.__name != 'string')  _attribute.__name = key_attribute// throw('[parsesetting _attribute.__name] 잘못된 값');
                     if(!check___access(_attribute.__access)) throw('[parsesetting check___access] 잘못된 객체');
                     if (typeof _attribute.__type != 'string') throw('[parsesetting _attribute.__type] 잘못된 값');
-                    _ctalbe[key_attribute] = create_dbattribute(_attribute.__name,_attribute.__access,_attribute.__type,_attribute.__promarykey,_attribute.__autucount,_attribute.__notnull)
+                    _ctalbe[key_attribute] = create_dbattribute(_attribute)
                     // __name:string,__access:string[4],__type
                 }
             }
@@ -146,17 +158,19 @@ class MDBMS_DB{
         this.__path = __path
         this.__dir = __dir
         this.file = create_dbfile(file.__type,__path,__dir)
+        createpath(this.__dir)
         this.parsesetting(file)
         this.setup()
     }
 
-    private setup(){
+    protected async setup(){
         // 체크하는 부분
         const checked = true
         // 값이 존재하면 사실 하기
         if(checked) return true 
 
         // DB 설정 코드
+        
 
         return true
     }
@@ -182,22 +196,72 @@ class MDBMS_DB{
 
 class DBMS_SQLite extends MDBMS_DB{
     private sqlite3:sqlite3
-    constructor(key:string, path:string,dir:string,setting:dbfile){
-        
-        super(key,path, dir,setting)
+    constructor(key:string, path:string,dir:string,file:dbfile){
+        if(!file.__dir) file.__dir=key+'.sqlite' //확장자 붙히기 위해
+        super(key,path, dir,file)
         this.sqlite3 = require('sqlite3').verbose();
+        
+        // this.setup()
     }
 
-    private setting(){
-        new this.sqlite3.Database('we')
+    protected async setup(){//return new Promise<boolean>((resolve,rejects)=>{
+        console.log('setting]t his.__dir',this.__dir)
+        if(!this.sqlite3) this.sqlite3 = require('sqlite3').verbose();
+        const db = new this.sqlite3.Database(this.__dir)
+        console.log('setting]t his.__dir2',this.__dir,db)
+        //db.serialize(async () => {
+            function getdb(sql:string,obj:{[key:string]:string|number|Buffer}){return new Promise((_resolve,_rejects)=>{
+                db.all(sql,obj,(err,data)=>{
+                    if(err) _rejects(err)
+                    else _resolve(data)
+                })
+            })}
+
+            const table_list = await getdb("SELECT * FROM sqlite_master WHERE type='table'",{});
+            console.log('[table_list],',table_list)
+            if(!Array.isArray(table_list)) throw('없움')
+
+            for(const $tablename of table_list.map(v=>v.name).filter(v=>!v.startsWith('sqlite_'))){
+                // console.log('[table_info]',$tablename,)
+                const table_info = await getdb(`PRAGMA table_info(${this.sqlinjection($tablename)})`,{} )
+                // https://sqlite.org/pragma.html#pragma_table_info
+                // The pragma command is specific to SQLite and is not compatible with any other SQL database engine.
+                // Specific pragma statements may be removed and others added in future releases of SQLite. There is no guarantee of backwards compatibility. 
+                // 대충 다음 버전에서 사라질 수 있다는 뜻. 호환 부족함 
+               console.log('[table_info]',$tablename,table_info,)
+            //    다음처럼 출력됨
+//     cid: 0,
+//     name: 'Field1',
+//     type: 'INTEGER',
+//     notnull: 0,
+//     dflt_value: null,
+//     pk: 1
+//   },
+            //
+            }
+            
+        //});
+        
+        db.close();
+        return true
+        //resolve(true)
+    //}
     }
     //데이터 읽기
     public get(table:string,attribute:string, option:any|undefined){
         // this.setup()
     }
     //데이터 추가
-    public post(table:string,attribute:string, option:any|undefined){
-
+    public post(table:string,attribute:string, option:any|undefined){return new Promise((resolve,rejects)=>{
+        // const db = new this.sqlite3.Database(this.__dir)
+        // db.serialize(()=>{
+        //     db.get(`selete * FROM $table `,{table},(err,data)=>{
+        //         if(err) throw('ewer');
+        //         return data
+        //     })
+        // })
+    })
+        
     }
     //데이터 수정
     public put(table:string,attribute:string, option:any|undefined){
@@ -208,9 +272,15 @@ class DBMS_SQLite extends MDBMS_DB{
 
     }
 
+    public sqlinjection(str:string){
+        // SELECT "INSERT" from "SELECT"이딴거
+       if( /\s|"|'|=|\*/gi.test(str)) throw('err sql not inval')
+        return str
+    }
+    
 }
 
-const mBDMS = new MBDMS({__type:"sqlite3",__path:undefined,__dir:undefined})
+const mBDMS = new MBDMS({db1:{__type:"sqlite3",__path:undefined,__dir:undefined}})
 mBDMS.post('db1','students','krr',undefined) // 추가
 mBDMS.get('db1','students','krr',{order:'min'}) // 데이터 읽기
 // mBDMS.get()

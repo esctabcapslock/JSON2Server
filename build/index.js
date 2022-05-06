@@ -16,11 +16,13 @@ const server_1 = require("./server");
 const path_1 = __importDefault(require("./module/path"));
 const file_1 = require("./module/file");
 const http_1 = require("http");
+const mdbms_1 = require("./module/mdbms");
 const { port } = server_1.setting;
 // console.log('[setting]',setting);
 (function main() {
     return __awaiter(this, void 0, void 0, function* () {
         const path = new path_1.default();
+        const mdbms = new mdbms_1.MBDMS(server_1.setting);
         path.parse_setting_json(server_1.setting);
         // db에 
         (0, http_1.createServer)((req, res) => __awaiter(this, void 0, void 0, function* () {
@@ -29,14 +31,14 @@ const { port } = server_1.setting;
                     throw ("url이 undefined");
                 if (req.headers.host == undefined)
                     throw ("host가 undefined");
-                const url = new URL(req.url, `http://${req.headers.host}`);
                 // console.log(url,req.headers.host)
-                const { type, todo } = yield path.parse(req, res, decodeURI(url.pathname));
+                const { type, todo } = yield path.parse(req, res);
                 if (type == 'file') {
                     yield (0, file_1.writefile)(res, todo, req.headers.range);
                 }
                 else if (type == 'db') {
-                    res.end('1');
+                    const _todo = todo;
+                    yield mdbms.parsehttp(res, _todo.method, _todo.file, _todo.table, _todo.attribute, _todo.option);
                 }
                 else if (type == 'api') {
                     res.end('1');
@@ -46,7 +48,7 @@ const { port } = server_1.setting;
                 }
             }
             catch (e) {
-                console.log('[error]', e);
+                console.log('[error-]', e);
                 const code_tmp = String(e).match(/\d+/);
                 if (code_tmp)
                     res.statusCode = Number(code_tmp[0]);

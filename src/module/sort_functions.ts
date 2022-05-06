@@ -1,3 +1,5 @@
+import { existsSync, mkdirSync } from "fs";
+
 export function parse_pathname(path:string){
     return path.replace(/\\/gi,'/').replace(/^(\.?)\//,'').replace(/\/$/,'')
 }
@@ -23,4 +25,19 @@ export function remove_high_dir(path:string){
 export function is_string_array(obj:any){
     if(!Array.isArray(obj)) return false
     return obj.every(v=>typeof v=='string')
+}
+
+
+export async function createpath(path:string){
+    const ar = parse_pathname(path).split('/')
+    ar.pop()
+    let d = ''
+    for (const dir of ar){
+        d += dir
+        if(!d) continue
+        console.log('createpath]',d)
+        if(!existsSync(d))
+             mkdirSync(d)
+    }
+
 }

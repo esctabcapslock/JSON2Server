@@ -38,8 +38,26 @@ exports.setting = {
         }
     }, db: {
         // db 읽고 쓰는건 자동으로. 파일 스팸차단 이런건 여기 달 수 있게끔
-        __type: "SQLite",
-        __path: "./db"
+        __path: "./db",
+        db1: {
+            __type: "SQLite",
+            students: {
+                __access: ['all', 'all', 'all', 'all'],
+                name: {
+                    __type: "string",
+                    __primarykey: false,
+                    __autoincrement: true,
+                    __notnull: true,
+                    __access: ['all', 'all', 'all', 'all'], //읽고, 추가. 수정. 삭제.
+                }, date: {
+                    __type: "int",
+                    __primarykey: false,
+                    __autoincrement: true,
+                    __notnull: true,
+                }
+            }
+        },
+        db2: {}
     }, firetype: {
         mapval: {
             name: "string|undfined",

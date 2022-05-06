@@ -12,7 +12,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.writefile = void 0;
 const fs_1 = require("fs");
 function get_file_type(mime) {
-    if (['txt', 'css', 'js', 'ts', 'html'].includes(mime)) {
+    if (['txt', 'css', 'js', 'ts', 'html', 'json'].includes(mime)) {
         return `text/${mime == 'txt' ? 'plain' : mime.replace('js', 'javascript')}; charset=utf-8`;
     }
     else
