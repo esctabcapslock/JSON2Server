@@ -50,7 +50,7 @@ export const setting = {
                     __notnull:true,
                     __access:['all','all','all','all'],//읽고, 추가. 수정. 삭제.
                 },date:{
-                    __type:"int",
+                    __type:"INTEGER",
                     __primarykey:false,
                     __autoincrement:true,
                     __notnull:true,

@@ -28,7 +28,7 @@ const {port} = setting;
                 await writefile(res,todo as string,req.headers.range);
             }
             else if (type=='db'){
-                const _todo = todo as {method:string,file:string,table:string,attribute:string,option:{[key:string]:string}}
+                const _todo = todo as {method:string,file:string,table:string,attribute:string|{[key:string]:string},option:{[key:string]:string}}
                 await mdbms.parsehttp(res,_todo.method,_todo.file,_todo.table,_todo.attribute,_todo.option)
                 
             }else if (type=='api'){
