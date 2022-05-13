@@ -20,6 +20,15 @@ export type dbattribute = {
 }
 
 
+// get**** : get 요청시 파일 구조
+export type getoption = {join:undefined|getjoin, as:getas|undefined, limit:undefined|null|number, order:undefined|getorder}
+export type getjoin = {[key:string]:[string,string]} //Join {"table1.file1": [table2,field2], … }
+export type getas = {[key:string]:[string,string]} //Join {"table1.file1": [table2,field2], … }
+export type getorder = {column:string,order:"asc"|"desc"} //Join {"table1.file1": [table2,field2], … }
+export type getattribute = {[key:string]:string|number}
+export type sqlallout = {[key:string]:string|null|number}[]
+// {[key:string]:string|number|null}
+
 
 // export function create_dbsetting():dbsetting{
 //     const out:dbsetting = {

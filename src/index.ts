@@ -45,7 +45,7 @@ const {port} = setting;
                 code_tmp ? Number(code_tmp[0]) : 404 , {
                 "Content-Type": 'text/plain; charset=utf-8',}
             )
-            res.end(e) //이거 고처야 함
+            res.end(e) //이거 고처야 함. 정식 릴리즈에는 사용자에게 에러를 보아면 안됨.
         }
     }).listen(port,()=>console.log(`Server is running at port ${port}`))
 })()

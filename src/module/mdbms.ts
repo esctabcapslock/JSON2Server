@@ -2,7 +2,7 @@ import {IncomingMessage,ServerResponse } from 'http'
 // import * as sqlite3 from 'sqlite3'
 import {sqlite3,Database} from 'sqlite3'
 import {parse_connect_pathname,createpath} from './sort_functions'
-import {dbsetting,dbfile,dbtable,dbattribute,create_dbfile,create_dbtable,create_dbattribute} from './mdbms_type'
+import {dbsetting,dbfile,dbtable,dbattribute,create_dbfile,create_dbtable,create_dbattribute,getoption,getattribute,sqlallout} from './mdbms_type'
 
 export class MBDMS{//Management System for DataBase Management System
     
@@ -34,9 +34,6 @@ export class MBDMS{//Management System for DataBase Management System
             }else throw('이상한 type')
         }
 
-    
-        
-
         // this.settime = setting
         
         
@@ -59,10 +56,10 @@ export class MBDMS{//Management System for DataBase Management System
         
     // }
 
-    public async parsehttp(res:ServerResponse,method:string,file:string,table:string,attribute:string|{[key:string]:string}, option:any|undefined){
+    public async parsehttp(res:ServerResponse,method:string,file:string,table:string,attribute:string|{[key:string]:string}, option:any|undefined|getoption){
         const _method = method.toLocaleLowerCase()
         let data
-        if(_method=='get') data = this.get(file,table,attribute as string,option)
+        if(_method=='get') data = this.get(file,table,attribute as getattribute,option as getoption|undefined)
         else if(_method=='post') data = this.post(file,table,attribute  as {[key:string]:string},option)
         else if(_method=='put') data = this.put(file,table,attribute  as string,option)
         else if(_method=='delete') data = this.delete(file,table,attribute  as string,option)
@@ -73,14 +70,14 @@ export class MBDMS{//Management System for DataBase Management System
         
     }
     
-    public get(file:string,table:string,attribute:string, option:any|undefined){
+    public get(file:string,table:string,attribute:getattribute, option:getoption|undefined){
         // this.setup()
         if(typeof this.dbmses[file] != 'object') throw('[get] this.dbmses[file] != object')
         return this.dbmses[file].get(table,attribute,option)
     }
     //데이터 추가
     // public post(file:string,table:string,attribute:string, option:any|undefined){
-    public async post(file:string,table:string,attribute:{[key:string]:string|number}, option:any|undefined){
+    public async post(file:string,table:string,attribute:getattribute, option:any|undefined){
         if(typeof this.dbmses[file] != 'object') throw('[get] this.dbmses[file] != object')
         return this.dbmses[file].post(table,attribute,option)
     }
@@ -178,19 +175,20 @@ class MDBMS_DB{
 
 
     //데이터 읽기
-    public get(table:string,attribute:string, option:any|undefined){
+    public async get(table:string,attribute:getattribute, option:getoption|undefined):Promise<sqlallout>{
         // this.setup()
+        return []
     }
     //데이터 추가
-    public async post(table:string,attribute:{[key:string]:string|number}, option:any|undefined){
+    public async post(table:string,attribute:getattribute, option:any|undefined){
 
     }
     //데이터 수정
-    public put(table:string,attribute:string, option:any|undefined){
+    public async put(table:string,attribute:string, option:any|undefined){
 
     }
     //데이터 삭제
-    public delete(table:string,attribute:string, option:any|undefined){
+    public async delete(table:string,attribute:string, option:any|undefined){
 
     }
 }
@@ -299,16 +297,40 @@ class DBMS_SQLite extends MDBMS_DB{
     //}
     }
     //데이터 읽기
-    public get(table:string,attribute:string, option:any|undefined){
+    public async get(table:string,attribute:getattribute, option:getoption|undefined){
         // this.setup()
+        // option  조건:
+        //attribute에 있어야 함.
+        if(!option) option = {join:undefined,limit:undefined,as:undefined,order:undefined}
+        let sql = `SELETE `
+        const field = [] as string[]
+        // attribute명
+        if(option.as){
+            for(const ketas in option.as){
+
+            }
+
+        }//as의 것들이 합당한지 판단
+
+        if(!field.length) throw('길이X')
+        sql+=`${field.join(',')} WHERE `
+
+        // whele문 작성
+
+
+        // 실행
+        const insert_out = await this.getdb(sql,{}) as sqlallout
+        console.log('[insert_out],',insert_out)
+        return insert_out
+        // 아마 반환하는거 타입이 {[key:string]:string|null|number}[]일텐데... 확실하지 않네?
     }
     //데이터 추가
-    public async post(table:string,attribute:{[key:string]:string|number|null}, option:any|undefined){
+    public async post(table:string,attribute:getattribute, option:any|undefined){
         const _table = this.check_valid_table(table,1)
 
         let cnt = 0
         const attribute_array = []
-        const attribute_dict = {} as {[key:string]:string|number|null}
+        const attribute_dict = {} as getattribute
 
 
         for (const attributename in attribute){
@@ -319,7 +341,7 @@ class DBMS_SQLite extends MDBMS_DB{
             attribute_dict[`$${cnt}`] = attribute[attributename]
         }
         const sql = `INSERT INTO ${this.sqlinjection(table)}  (${attribute_array.join(', ')}) VALUES(${(Array(cnt)).fill(0).map((v,i)=>`$${i+1}`).join(',')});`
-        const insert_out = await this.getdb(sql,attribute_dict)
+        const insert_out = await this.getdb(sql,attribute_dict) as sqlallout
         console.log('[insert_out],',insert_out)
         // 그 밖에 notnull 배먹은 키는 sql이 잘 거르겠지??
         // 타입체크하기
@@ -329,11 +351,11 @@ class DBMS_SQLite extends MDBMS_DB{
         
     }
     //데이터 수정
-    public put(table:string,attribute:string, option:any|undefined){
+    public async put(table:string,attribute:string, option:any|undefined){
 
     }
     //데이터 삭제
-    public delete(table:string,attribute:string, option:any|undefined){
+    public async delete(table:string,attribute:string, option:any|undefined){
 
     }
 
@@ -395,5 +417,5 @@ const mBDMS = new MBDMS({db1:{__type:"sqlite3",__path:undefined,__dir:undefined,
     }
 }}})
 mBDMS.post('db1','students',{'name':'ftjl'},undefined) // 추가
-mBDMS.get('db1','students','krr',{order:'min'}) // 데이터 읽기
+mBDMS.get('db1','students',{},undefined) // 데이터 읽기
 // mBDMS.get()
