@@ -70,7 +70,7 @@ export function create_dbattribute(option:dbattribute):dbattribute{
         else return false
     }
     if(option.__autoincrement){
-        if(option.__type.toUpperCase()!='INTEGER')  throw('__type이 정수 아니면 '+option.__type+'option.__autoincrement false')
+        if(option.__type.toUpperCase()!='INTEGER')  throw(`name:${option.__name} __type이 정수 아니면 ${+option.__type} option.__autoincrement false`)
         if(!option.__primarykey)  throw('option.__autoincrement true면 __primarykey must be true')
 
     }
@@ -92,6 +92,8 @@ export function create_dbattribute(option:dbattribute):dbattribute{
     if(!['NULL','INTEGER','REAL','TEXT','BLOB','NUMERIC'].includes(__type)) throw('option.__type not '+__type)
 
     //filiter
+    if(typeof option.__name != 'string') throw('option name is not string')
+
     if(option.__filiter!=undefined &&!(option.__filiter instanceof RegExp))  option.__filiter = RegExp(option.__filiter)
     if(__type =='BLOB') option.__filiter = undefined
 

@@ -1,16 +1,16 @@
-import {setting} from './server'
 import Path from "./module/path"
 import {writefile} from "./module/file"
 import { createServer,IncomingMessage,ServerResponse } from 'http'
 import { MBDMS } from './module/mdbms';
 import { parse_pathname } from './module/sort_functions';
-const {port} = setting;
+// import {setting} from './server'
+
 // console.log('[setting]',setting);
 
-(async function main (){
-    
+export default async function main (setting:any){
+    const {port} = setting;
     const path = new Path()
-    const mdbms = new MBDMS(setting)
+    const mdbms = new MBDMS(setting.db)
     path.parse_setting_json(setting)
 
     // db에 
@@ -41,7 +41,7 @@ const {port} = setting;
             }else{throw('알 수 없는 type 오류')}
         
         }catch(e){
-            console.log('[error-]',e)
+            console.log('[error--]',e)
 
             const code_tmp = String(e).match(/\d+/,)
             if(code_tmp) res.statusCode = Number(code_tmp[0])
@@ -49,8 +49,8 @@ const {port} = setting;
             res.writeHead(
                 code_tmp ? Number(code_tmp[0]) : 404 , {
                 "Content-Type": 'text/plain; charset=utf-8',}
-            )
-            res.end(e) //이거 고처야 함. 정식 릴리즈에는 사용자에게 에러를 보아면 안됨.
+            );
+            res.end(e); //이거 고처야 함. 정식 릴리즈에는 사용자에게 에러를 보아면 안됨.
         }
     }).listen(port,()=>console.log(`Server is running at port ${port}`))
-})()
+}

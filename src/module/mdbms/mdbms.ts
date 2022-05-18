@@ -6,8 +6,6 @@ import {dbfile,getoption,getattribute, check_getoption, check_getattribute} from
 
 import {MDBMS_DB} from './mdbms_db'
 import {MDBMS_SQLite} from './mdbms_sqlite'
-import { resolve } from 'path'
-import { rejects } from 'assert'
 
 export class MBDMS{//Management System for DataBase Management System
     
@@ -31,7 +29,7 @@ export class MBDMS{//Management System for DataBase Management System
                 else continue
             }
             const file = setting[key] as dbfile
-            if(typeof file.__type != 'string') throw('[__tpye string 아님') 
+            if(typeof file.__type != 'string') throw(`[__tpye string 아님, file.__type:${file.__type}, key:${key}`) 
             const __type = file.__type.toLocaleLowerCase()
             if(__type=='sqlite'||__type=='sqlite3'){
                 this.dbmses[key] = new MDBMS_SQLite(key,__path,__dir, file)
@@ -61,74 +59,86 @@ export class MBDMS{//Management System for DataBase Management System
         
     // }
 
-    public is_db_url(url:URL, _method:string):boolean|string{
+    public is_db_url(url:URL, _method:string):false|string{
         const method = _method.toLocaleUpperCase()
         if(!['GET','POST','PUT','DELETE'].includes(method)) return false
         for (const file in this.dbmses){
-            if(RegExp('^'+this.dbmses[file].path).test(url.pathname)) return file
+            if(this.dbmses[file].path == parse_pathname(url.pathname)) return file
         }
         return false
 
     }
-    public async parsehttp(req:IncomingMessage,res:ServerResponse, url:URL, method:string){////return new Promise((resolve,rejects)=>{
+    public async parsehttp(req:IncomingMessage,res:ServerResponse, url:URL, method:string){return new Promise<boolean>(async (resolve,rejects)=>{
         method = method.toLocaleUpperCase()
-        const talbe_name = this.is_db_url(url,method)
-        if(!talbe_name) return false
+        const file_name = this.is_db_url(url,method)
+        if(!file_name) {resolve(false); return}
 
-        const JSON_parse = (x:string|null) => x==null?x:JSON.parse(x)
+        const JSON_parse = (x:string|null) => {
+            if(x==null) return null
+            else try{return JSON.parse(x)}catch(e){rejects(`e:${e}, x:${x}`)}
+        }
+        console.log(url)
         if (url.search){
-            this.parsedohttp(
+            try{
+            await this.parsedohttp(
                 res,method,
-                url.searchParams.get('file'),
+                file_name,
                 url.searchParams.get('table'),
                 JSON_parse(url.searchParams.get('attribute')),
                 JSON_parse(url.searchParams.get('where')),
                 JSON_parse(url.searchParams.get('option'))
                 )
+                resolve(true)
+            }catch(e) {rejects(`404 응답 get json 형태 X ${e}`)}
         }else{
             const data:Buffer[] = []
+            // try{
             // req.res
-            req.on('data', (chunk)=> data.push(Buffer.from(chunk)))
-            req.on('end',()=>{
-                const{file,table,where,attribute,option} = JSON.parse(Buffer.concat(data).toString())
-                this.parsedohttp(res,method,file,table,attribute,where,option)
-            })
-            req.on('error',()=>{
-                throw('error req')
-            })
-            };
-        //})
-    }
+                req.on('data', (chunk)=> data.push(Buffer.from(chunk)))
+                req.on('end',async()=>{
+                    try{
+                        const{file_name,table,where,attribute,option} = JSON.parse(Buffer.concat(data).toString())
+                        await this.parsedohttp(res,method,file_name,table,attribute,where,option)
+                        resolve(true)
+                    }catch(e) {rejects(`404 응답 json 형태 X ${e}`)}
+                })
+                req.on('error',()=>{
+                    rejects('error req')
+                })
+            // }catch(e){rejects(`404 e:${e}`)}
+        };
+    })}
     public async parsedohttp(res:ServerResponse,method:string,file:string|null,table:string|null,attribute:getattribute|null,where:getattribute|null|string[], option:null|getoption){
-        let data
+        try{
+            let data
 
-        if(!table || typeof table != 'string') throw('400 error table formet')
-        if(!file  || typeof file != 'string') throw('400 error table formet')
-        switch (method){
-            case 'GET':
-                if(!Array.isArray(attribute) || !is_string_array(attribute)) throw('err attribure err')
-                data = this.get(file,table,attribute, check_getoption(option))
-                break
-            case 'POST':
-                data = this.post(file,table,check_getattribute(attribute))
-                break
-            case 'PUT':
-                data = this.put(file,table,check_getattribute(attribute), check_getattribute(where))
-                break
-            case 'DELETE':
-                data = this.delete(file,table,check_getattribute(where))
-                break
-            default:
-                throw('[err] parsehttp '+method)
-
-
+            if(!table || typeof table != 'string') throw('400 error table formet')
+            if(!file  || typeof file != 'string') throw('400 error table formet')
+            switch (method){
+                case 'GET':
+                    if(!Array.isArray(attribute) || !is_string_array(attribute)) throw('err attribure err')
+                    data = await this.get(file,table,attribute, check_getoption(option))
+                    break
+                case 'POST':
+                    data = await this.post(file,table,check_getattribute(attribute))
+                    break
+                case 'PUT':
+                    data = await this.put(file,table,check_getattribute(attribute), check_getattribute(where))
+                    break
+                case 'DELETE':
+                    data = await this.delete(file,table,check_getattribute(where))
+                    break
+                default:
+                    throw('[err] parsehttp '+method)
+            }
+    
+            
+            //return {code:200,header:{'Content-Type':'text/json;charset=utf-8'}, data}
+            res.writeHead(200,{'Content-Type':'application/json;charset=utf-8'})
+            res.end(data!=undefined?JSON.stringify(data):'{}')
+        }catch(e) {
+            throw(`404 [parsedohttp] e:${e}`)
         }
- 
-        
-        //return {code:200,header:{'Content-Type':'text/json;charset=utf-8'}, data}
-        res.writeHead(200,{'Content-Type':'text/json;charset=utf-8'})
-        res.end(data!=undefined?JSON.stringify(data):'{}')
-        
     }
     
     public get(file:string,table:string,attribute:string[], option:getoption|null=null){

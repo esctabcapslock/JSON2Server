@@ -9,14 +9,13 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     });
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-const digest_1 = require("../tool/digest");
 const sort_functions_1 = require("./sort_functions");
 const path_type_1 = require("./path_type");
 class Path {
     constructor() {
         this.path_dict = (0, path_type_1.create_path_dict)();
         this.path_dict.__type = 'file';
-        this.digest = new digest_1.Digest('/', () => '1234');
+        // this.digest = new Digest('/',()=>'1234')
         this.assess = null;
         this.user_list = [];
     }
@@ -57,6 +56,7 @@ class Path {
             this.application_path(setting.logging.path, false);
         }
         if (setting.db) {
+            // 따로 구현함.
         }
         if (setting.api) {
         }
@@ -115,13 +115,12 @@ class Path {
             const pathname = decodeURI(url.pathname);
             //길이가 이상하거나, 하는 등 유효겅 검사 코드 추가 필요
             // 인증 관련 처리 -> 모듈화할것
-            let auth = true;
-            if (this.assess == 'digest') {
-                auth = yield this.digest.server(req, res);
-                if (!auth)
-                    return { type: 'none', todo: '' };
-            }
-            const access = auth ? 'all' : '';
+            // let auth = true
+            // if(this.assess=='digest'){
+            //     auth =  await this.digest.server(req,res)
+            //     if(!auth) return {type:'none', todo:''}
+            // }
+            const access = 'all'; //:''
             const path_arr = (0, sort_functions_1.parse_pathname)(pathname).split('/');
             if (path_arr.some(v => v.startsWith('__')))
                 throw ('400 폴더 중 __으로 시작하는게 있음');
@@ -133,7 +132,7 @@ class Path {
             let notdirin = false;
             let type = this.path_dict.__type;
             for (const dir of path_arr) {
-                console.log('[parse] for(const dir of path_arr)', { dir, filepath, notdirin, type, path_arr });
+                console.log('[parse] for(const dir of path_arr)', { url, dir, filepath, notdirin, type, path_arr });
                 if (notdirin) {
                     filepath += '/' + dir;
                     continue;

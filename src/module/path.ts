@@ -6,14 +6,14 @@ import {path_dict,file_dict,create_path_dict,create_file_dict} from './path_type
 
 export default class Path{
     path_dict:path_dict
-    digest:Digest
+    // digest:Digest
     assess:null|string
     user_list:{user_agent:string,cookies:string,settime:number}[]
     
     constructor(){
         this.path_dict = create_path_dict()
         this.path_dict.__type = 'file'
-        this.digest = new Digest('/',()=>'1234')
+        // this.digest = new Digest('/',()=>'1234')
         this.assess = null
         this.user_list = []
     }
@@ -90,15 +90,15 @@ export default class Path{
         //길이가 이상하거나, 하는 등 유효겅 검사 코드 추가 필요
 
         // 인증 관련 처리 -> 모듈화할것
-        let auth = true
+        // let auth = true
 
-        if(this.assess=='digest'){
-            auth =  await this.digest.server(req,res)
-            if(!auth) return {type:'none', todo:''}
-        }
+        // if(this.assess=='digest'){
+        //     auth =  await this.digest.server(req,res)
+        //     if(!auth) return {type:'none', todo:''}
+        // }
 
 
-        const access = auth?'all':''
+        const access = 'all'//:''
 
 
         const path_arr = parse_pathname(pathname).split('/')
@@ -112,7 +112,7 @@ export default class Path{
         let type = this.path_dict.__type
 
         for(const dir of path_arr){
-            console.log('[parse] for(const dir of path_arr)',{dir, filepath, notdirin,type,path_arr})
+            console.log('[parse] for(const dir of path_arr)',{url,dir, filepath, notdirin,type,path_arr})
             if(notdirin){filepath += '/'+dir; continue;}
 
             if(dir.startsWith('__')) throw('400 잘못된 경로입니다')

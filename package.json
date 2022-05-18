@@ -7,6 +7,7 @@
     "test": "index.js",
     "start": "node main.ts",
     "dev": "ts-node src",
+    "test-ex1": "ts-node example/ex1/app.ts",
     "dev-db": "ts-node src/module/mdbms.ts"
   },
   "repository": {

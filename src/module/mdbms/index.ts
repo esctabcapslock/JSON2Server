@@ -15,6 +15,8 @@ const mBDMS = new MBDMS({db1:{__type:"sqlite3",__path:undefined,__dir:undefined,
         __notnull:true,
     }
 }}})
-mBDMS.post('db1','students',{'name':'ftjl'},undefined) // 추가
-mBDMS.get('db1','students',[],undefined) // 데이터 읽기
+
+// for test
+//mBDMS.post('db1','students',{'name':'ftjl'},undefined) // 추가
+//mBDMS.get('db1','students',['name'],undefined) // 데이터 읽기
 // mBDMS.get()
