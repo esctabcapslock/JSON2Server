@@ -41,3 +41,12 @@ export async function createpath(path:string){
     }
 
 }
+
+export function array_value_equal(arr1:any[], arr2:any[]){
+    return arr1.every(v=>arr2.includes(v)) && arr2.every(v=>arr1.includes(v))
+}
+export function check_string_array(arr:any[]):string[]{
+    if (!arr.every(v=>typeof v == 'string'))  throw('error not string[]')
+    else return arr
+    
+}

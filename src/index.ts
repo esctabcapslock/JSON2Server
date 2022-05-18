@@ -3,6 +3,7 @@ import Path from "./module/path"
 import {writefile} from "./module/file"
 import { createServer,IncomingMessage,ServerResponse } from 'http'
 import { MBDMS } from './module/mdbms';
+import { parse_pathname } from './module/sort_functions';
 const {port} = setting;
 // console.log('[setting]',setting);
 
@@ -18,7 +19,15 @@ const {port} = setting;
         try{
             if(req.url==undefined) throw("url이 undefined")
             if(req.headers.host==undefined) throw("host가 undefined")
+            if(req.method==undefined) throw("method가 undefined")
+            // const url = req.url
+            // const host = req.headers.host
+            const url = new URL(`http://${req.headers.host}/${parse_pathname(req.url)}`);
+            const method = req.method.toUpperCase()
 
+            // db 요청인지 확인
+            if(await mdbms.parsehttp(req,res,url,method)) return true
+            
             
             // console.log(url,req.headers.host)
 
@@ -27,11 +36,7 @@ const {port} = setting;
             if (type=='file'){
                 await writefile(res,todo as string,req.headers.range);
             }
-            else if (type=='db'){
-                const _todo = todo as {method:string,file:string,table:string,attribute:string|{[key:string]:string},option:{[key:string]:string}}
-                await mdbms.parsehttp(res,_todo.method,_todo.file,_todo.table,_todo.attribute,_todo.option)
-                
-            }else if (type=='api'){
+            else if (type=='api'){
                 res.end('1')
             }else{throw('알 수 없는 type 오류')}
         

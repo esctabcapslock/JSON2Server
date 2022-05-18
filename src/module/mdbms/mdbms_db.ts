@@ -1,16 +1,22 @@
-import {dbsetting,dbfile,dbtable,dbattribute,create_dbfile,create_dbtable,create_dbattribute,getoption,getattribute,sqlallout} from './mdbms_type'
+import {dbfile,dbtable,dbattribute,create_dbfile,create_dbtable,create_dbattribute,getoption,getattribute,sqlallout} from './mdbms_type'
 import {parse_connect_pathname,createpath} from '../sort_functions'
 
 export class MDBMS_DB{
     protected file:dbfile;
     protected __path: string;
     protected __dir: string;
+    protected __quarylimit : number|undefined;
+
+    get path(){return this.__path} 
+    
     public parsesetting(file:dbfile){
 
         function check___access(tmp:any){
             if (!Array.isArray(tmp) || tmp.length!=4 || !tmp.every(v=>(typeof v =='string')))  return false
             else return true
         }
+
+        
 
         // this.
         // this.settime = setting
@@ -59,9 +65,10 @@ export class MDBMS_DB{
         if(typeof key != 'string') throw('[__tpye string 아님') 
         const __path = parse_connect_pathname(path,file.__path?file.__path:key)
         const __dir = parse_connect_pathname(dir,file.__dir?file.__dir:key)
-        this.__path = __path
-        this.__dir = __dir
-        this.file = create_dbfile(file.__type,__path,__dir)
+        this.__path = __path;
+        this.__dir = __dir;
+        this.__quarylimit = file.__quarylimit;
+        this.file = create_dbfile(file.__type,__path,__dir, file.__quarylimit)
         createpath(this.__dir)
         this.parsesetting(file)
         this.setup()
@@ -81,20 +88,20 @@ export class MDBMS_DB{
 
 
     //데이터 읽기
-    public async get(table:string,attribute:string[], option:getoption|undefined):Promise<sqlallout>{
+    public async get(table:string,attribute:string[], option:getoption|null=null):Promise<sqlallout>{
         // this.setup()
         return []
     }
     //데이터 추가
-    public async post(table:string,attribute:getattribute, option:any|undefined){
+    public async post(table:string,attribute:getattribute, option:null=null){
 
     }
     //데이터 수정
-    public async put(table:string,attribute:string, option:any|undefined){
+    public async put(table:string,attribute:getattribute,where:getattribute, option:null=null){
 
     }
     //데이터 삭제
-    public async delete(table:string,attribute:string, option:any|undefined){
+    public async delete(table:string,where:getattribute, option:null=null){
 
     }
 }

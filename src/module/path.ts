@@ -46,7 +46,7 @@ export default class Path{
             this.application_path(setting.logging.path, false)
         }
         if(setting.db){
-
+            // 따로 구현함.
         }if(setting.api){
 
         }if(setting.access){

@@ -1,11 +1,13 @@
 import {IncomingMessage,ServerResponse } from 'http'
 // import * as sqlite3 from 'sqlite3'
 
-import {parse_connect_pathname,createpath} from '../sort_functions'
-import {dbsetting,dbfile,dbtable,dbattribute,create_dbfile,create_dbtable,create_dbattribute,getoption,getattribute,sqlallout} from './mdbms_type'
+import {createpath,parse_pathname,is_string_array} from '../sort_functions'
+import {dbfile,getoption,getattribute, check_getoption, check_getattribute} from './mdbms_type'
 
 import {MDBMS_DB} from './mdbms_db'
 import {MDBMS_SQLite} from './mdbms_sqlite'
+import { resolve } from 'path'
+import { rejects } from 'assert'
 
 export class MBDMS{//Management System for DataBase Management System
     
@@ -15,8 +17,8 @@ export class MBDMS{//Management System for DataBase Management System
     private dbmses:{[key:string]:MDBMS_DB};
     
     constructor(setting:{[key:string]:any}){//as dbfile
-        const __path = (setting.__path?setting.__path:'db')
-        const __dir = (setting.__dir?setting.__dir:'db')
+        const __path = parse_pathname(setting.__path?setting.__path:'db')
+        const __dir = parse_pathname(setting.__dir?setting.__dir:'db')
         this.__path = __path
         this.__dir = __dir
         this.dbmses = {}
@@ -59,40 +61,96 @@ export class MBDMS{//Management System for DataBase Management System
         
     // }
 
-    public async parsehttp(res:ServerResponse,method:string,file:string,table:string,attribute:string|string[]|{[key:string]:string}, option:any|undefined|getoption){
-        const _method = method.toLocaleLowerCase()
+    public is_db_url(url:URL, _method:string):boolean|string{
+        const method = _method.toLocaleUpperCase()
+        if(!['GET','POST','PUT','DELETE'].includes(method)) return false
+        for (const file in this.dbmses){
+            if(RegExp('^'+this.dbmses[file].path).test(url.pathname)) return file
+        }
+        return false
+
+    }
+    public async parsehttp(req:IncomingMessage,res:ServerResponse, url:URL, method:string){////return new Promise((resolve,rejects)=>{
+        method = method.toLocaleUpperCase()
+        const talbe_name = this.is_db_url(url,method)
+        if(!talbe_name) return false
+
+        const JSON_parse = (x:string|null) => x==null?x:JSON.parse(x)
+        if (url.search){
+            this.parsedohttp(
+                res,method,
+                url.searchParams.get('file'),
+                url.searchParams.get('table'),
+                JSON_parse(url.searchParams.get('attribute')),
+                JSON_parse(url.searchParams.get('where')),
+                JSON_parse(url.searchParams.get('option'))
+                )
+        }else{
+            const data:Buffer[] = []
+            // req.res
+            req.on('data', (chunk)=> data.push(Buffer.from(chunk)))
+            req.on('end',()=>{
+                const{file,table,where,attribute,option} = JSON.parse(Buffer.concat(data).toString())
+                this.parsedohttp(res,method,file,table,attribute,where,option)
+            })
+            req.on('error',()=>{
+                throw('error req')
+            })
+            };
+        //})
+    }
+    public async parsedohttp(res:ServerResponse,method:string,file:string|null,table:string|null,attribute:getattribute|null,where:getattribute|null|string[], option:null|getoption){
         let data
-        if(_method=='get') data = this.get(file,table,attribute as string[],option as getoption|undefined)
-        else if(_method=='post') data = this.post(file,table,attribute  as {[key:string]:string},option)
-        else if(_method=='put') data = this.put(file,table,attribute  as string,option)
-        else if(_method=='delete') data = this.delete(file,table,attribute  as string,option)
-        else throw('[err] parsehttp'+_method)
+
+        if(!table || typeof table != 'string') throw('400 error table formet')
+        if(!file  || typeof file != 'string') throw('400 error table formet')
+        switch (method){
+            case 'GET':
+                if(!Array.isArray(attribute) || !is_string_array(attribute)) throw('err attribure err')
+                data = this.get(file,table,attribute, check_getoption(option))
+                break
+            case 'POST':
+                data = this.post(file,table,check_getattribute(attribute))
+                break
+            case 'PUT':
+                data = this.put(file,table,check_getattribute(attribute), check_getattribute(where))
+                break
+            case 'DELETE':
+                data = this.delete(file,table,check_getattribute(where))
+                break
+            default:
+                throw('[err] parsehttp '+method)
+
+
+        }
  
+        
+        //return {code:200,header:{'Content-Type':'text/json;charset=utf-8'}, data}
         res.writeHead(200,{'Content-Type':'text/json;charset=utf-8'})
         res.end(data!=undefined?JSON.stringify(data):'{}')
         
     }
     
-    public get(file:string,table:string,attribute:string[], option:getoption|undefined){
+    public get(file:string,table:string,attribute:string[], option:getoption|null=null){
         // this.setup()
         if(typeof this.dbmses[file] != 'object') throw('[get] this.dbmses[file] != object')
         return this.dbmses[file].get(table,attribute,option)
     }
     //데이터 추가
     // public post(file:string,table:string,attribute:string, option:any|undefined){
-    public async post(file:string,table:string,attribute:getattribute, option:any|undefined){
+    public async post(file:string,table:string,attribute:getattribute, option:null=null){
         if(typeof this.dbmses[file] != 'object') throw('[get] this.dbmses[file] != object')
         return this.dbmses[file].post(table,attribute,option)
     }
     //데이터 수정
-    public put(file:string,table:string,attribute:string, option:any|undefined){
+    public put(file:string,table:string,attribute:getattribute,where:getattribute, option:null=null){
         if(typeof this.dbmses[file] != 'object') throw('[get] this.dbmses[file] != object')
-        return this.dbmses[file].put(table,attribute,option)
+        return this.dbmses[file].put(table,attribute,where,option)
     }
     //데이터 삭제
-    public delete(file:string,table:string,attribute:string, option:any|undefined){
+    public delete(file:string,table:string,where:getattribute, option:null=null){
         if(typeof this.dbmses[file] != 'object') throw('[get] this.dbmses[file] != object')
-        return this.dbmses[file].delete(table,attribute,option)
+        return this.dbmses[file].delete(table,where,option)
     }
 
      
