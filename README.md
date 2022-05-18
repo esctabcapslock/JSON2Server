@@ -67,10 +67,6 @@ YAML이 상위호환이니까 이것도 될 듯
     - 1인당 요청제한
 - 
 
-## 참고
-- 사진: [무료 이미지 사이트](https://pixabay.com)
-
-
 ### __Allow option setting
 
 - Username 이 옳을 경우만 호출하듯,
@@ -89,3 +85,7 @@ YAML이 상위호환이니까 이것도 될 듯
 - 2순위: 그냥생성 - sqlite로 로컬로
 - 무조건! Allows 옵션은 admin으로 하며, http 접근 불가하게 함
 - 또한 이 .sqlite파일의 https 접근을 막아야함.
+
+
+## 참고
+- 사진: [무료 이미지 사이트](https://pixabay.com)

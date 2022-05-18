@@ -87,6 +87,3 @@ module.exports = setting = {
     port:80,
 
 }
-    
-// 맞다 권한
-// 권한과 db구성

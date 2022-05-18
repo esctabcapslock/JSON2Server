@@ -17,9 +17,9 @@ export default async function main (setting:any){
 
     createServer(async (req:IncomingMessage,res:ServerResponse)=>{
         try{
-            if(req.url==undefined) throw("url이 undefined")
-            if(req.headers.host==undefined) throw("host가 undefined")
-            if(req.method==undefined) throw("method가 undefined")
+            if(req.url===undefined) throw("url이 undefined")
+            if(req.headers.host===undefined) throw("host가 undefined")
+            if(req.method===undefined) throw("method가 undefined")
             // const url = req.url
             // const host = req.headers.host
             const url = new URL(`http://${req.headers.host}/${parse_pathname(req.url)}`);

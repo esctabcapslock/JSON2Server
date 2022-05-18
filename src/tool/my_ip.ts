@@ -5,7 +5,7 @@ const interfaces = networkInterfaces();
 const addresses:string[] = [];
 for (const iname in interfaces) {
     const ifs = interfaces[iname]
-    if(ifs==undefined) continue
+    if(ifs===undefined) continue
     for (const address of ifs) {
         if (address.family === 'IPv4' && !address.internal) {
             addresses.push(address.address);
