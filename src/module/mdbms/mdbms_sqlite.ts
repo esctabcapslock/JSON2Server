@@ -1,20 +1,19 @@
 import {sqlite3,Database} from 'sqlite3'
 import {MDBMS_DB} from './mdbms_db'
-import {dbfile,dbtable,dbattribute,getoption,getattribute,sqlallout,get_attribute_from_table} from './mdbms_type'
+import {Dbtable,Dbattribute,Getoption,getattribute,sqlallout,get_attribute_from_table} from './mdbms_type'
 import {check_string_array, is_string_array} from '../sort_functions'
-
 
 export class MDBMS_SQLite extends MDBMS_DB{
     private sqlite3:sqlite3
     private db:Database
-    constructor(key:string, path:string,dir:string,file:dbfile){
+    constructor(key:string, path:string,dir:string,file:{[key:string]:any}){
         if(!file.__dir) file.__dir=key+'.sqlite' //확장자 붙히기 위해
         super(key,path, dir,file)
         this.sqlite3 = require('sqlite3').verbose();
         // this.__dir = '/'+this.__dir
-        console.log('[this.__dir] - MDBMS_SQLite',__dirname, this.__dir)
+        console.log('[this.__dir] - MDBMS_SQLite',__dirname, this.dir)
         require('fs').writefile
-        this.db = new this.sqlite3.Database(this.__dir)
+        this.db = new this.sqlite3.Database(this.dir)
         
         this.setup()
     }
@@ -30,10 +29,10 @@ export class MDBMS_SQLite extends MDBMS_DB{
     protected async setup(){//return new Promise<boolean>((resolve,rejects)=>{
         if(!this.db) return false
 
-        console.log('setting]t his.__dir',this.__dir)
+        console.log('setting]t his.__dir',this.dir)
         if(!this.sqlite3) this.sqlite3 = require('sqlite3').verbose();
         
-        console.log('setting]t his.__dir2',this.__dir)
+        console.log('setting]t his.__dir2',this.dir)
         //db.serialize(async () => {
             
 
@@ -55,13 +54,13 @@ export class MDBMS_SQLite extends MDBMS_DB{
             for(const tablename in this.file) if(!tablename.startsWith('__')){
                 //console.log('[this.file[tablename]',tablename,this.file[tablename])
                 if(!exist_table_names.includes(tablename)){
-                    const _table = this.file[tablename] as dbtable
+                    const _table:Dbtable = this.file.data[tablename]
 
-                    const create_sql_bytable = (tablename:string,table:dbtable) =>{
+                    const create_sql_bytable = (tablename:string,table:Dbtable) =>{
                         let out = `CREATE TABLE "${this.sqlinjection(tablename)}"(\n`
                         const attribute_sql_list = []
-                        for(const attributename in table) if(!attributename.startsWith('__')){
-                            console.log('[table[attributename]',attributename,table[attributename])
+                        for(const attributename in table.data) if(!attributename.startsWith('__')){
+                            console.log('[table[attributename]',attributename,table.data[attributename])
                             attribute_sql_list.push(create_sql_by_attribute(attributename,get_attribute_from_table(table, attributename)))
                         }
                         out += attribute_sql_list.join(',\n') + '\n)'
@@ -69,17 +68,17 @@ export class MDBMS_SQLite extends MDBMS_DB{
                         return out
                     }
 
-                    const create_sql_by_attribute = (attributename:string,attribute:dbattribute)=>{
-                        let out = `"${this.sqlinjection(attributename)}"    ${this.sqlinjection(attribute.__type.toUpperCase())} `
+                    const create_sql_by_attribute = (attributename:string,attribute:Dbattribute)=>{
+                        let out = `"${this.sqlinjection(attributename)}"    ${this.sqlinjection(attribute.type.toUpperCase())} `
                         const settings = []
-                        if(attribute.__primarykey) settings.push('PRIMARY KEY')
-                        if(attribute.__autoincrement) settings.push('AUTOINCREMENT')
-                        if(attribute.__default) settings.push('DEFAULT '+(
-                            typeof attribute.__default == 'number')?attribute.__default:
-                            (attribute.__default=='null'||attribute.__default==null)?'null':`"${this.sqlinjection(attribute.__default)}"`)
-                        if(attribute.__unique) settings.push('UNIQUE')
-                        if(attribute.__notnull) settings.push('NOT NULL')
-                        if(attribute.__check) settings.push(`CHECK ${this.sqlinjection(attribute.__check)}`)
+                        if(attribute.primarykey) settings.push('PRIMARY KEY')
+                        if(attribute.autoincrement) settings.push('AUTOINCREMENT')
+                        if(attribute.default) settings.push('DEFAULT '+(
+                            typeof attribute.default == 'number')?attribute.default:
+                            (attribute.default=='null'||attribute.default==null)?'null':`"${this.sqlinjection(attribute.default)}"`)
+                        if(attribute.unique) settings.push('UNIQUE')
+                        if(attribute.notnull) settings.push('NOT NULL')
+                        if(attribute.check) settings.push(`CHECK ${this.sqlinjection(attribute.check)}`)
 
                         return out + settings.join(' ')
                     }
@@ -106,11 +105,11 @@ export class MDBMS_SQLite extends MDBMS_DB{
         return true
     }
     //데이터 읽기
-    public async get(table:string,attribute:string[], option:getoption|null=null){
+    public async get(table:string,attribute:string[], option:Getoption|null=null){
         // this.setup()
         // option  조건:
         //attribute에 있어야 함.
-        if(!option) option = {join:undefined,limit:undefined,as:undefined,order:undefined}
+        if(!option) option = new Getoption({join:undefined,limit:undefined,as:undefined,order:undefined}) //{join:undefined,limit:undefined,as:undefined,order:undefined}
         let sql = `SELECT`
         // const field:string[] = [] 
 
@@ -127,22 +126,24 @@ export class MDBMS_SQLite extends MDBMS_DB{
             for (const val of attribute) this.check_accessible_attribute_with_dot(table,val) //) req_attribute.push(val)
                 
             // join의 값들 유효성 확인
-            if (option.join) for (const val in option.join) {
+            if (option.join) if(!option.join.getlist().every(val=>{
+                if(!option || !option.join) throw('뭔기 이상함');
                 if (!val.includes('')) throw('option join key 유효X 문자')
                 this.check_accessible_attribute_with_dot('',val)
-                const [tablename, attributename] = option.join[val]
+                const [tablename, attributename] = option.join?.get(val)
                 this.check_valid_table(tablename, 1)
                 this.check_accessible_attribute(tablename, 1, attributename)
-            }
-
+            })) throw('option join 유효X')
+            
             //as의 값들 유효성 확인
-            if (option.as) for (const val in option.as){
+            if (option.as) if(!option.as.getlist().every(val=>{
+                if(!option || !option.as) throw('뭔기 이상함');
                 if (!val.includes('')) throw('option as key 유효X 문자')
                 this.check_accessible_attribute_with_dot('',val)
-                this.sqlinjection(option.as[val])
-            } 
+                this.sqlinjection(option.as.get(val))
+            })) throw('option as 유효X')
 
-            if (!option.limit && this.__quarylimit) option.limit = this.__quarylimit
+            if (!option.limit && this.quarylimit) option.limit = this.quarylimit
             if (Number.isInteger(!option.limit)) throw('limit 잘못됨')
 
             if(option.order){
@@ -160,12 +161,12 @@ export class MDBMS_SQLite extends MDBMS_DB{
         //sql문 생성
 
         sql += ' ' + attribute.map(v=> {
-            if(option?.as && v in option.as) return `${v} AS ${option.as[v]}`  
+            if(option?.as && v in option.as) return `${v} AS ${option.as.get(v)}`  
             else return v
         }).join(',') + ` FROM ${table}`
         if(option.join) for(const val in option.join){
 
-            const [tablename, attributename] = option.join[val];
+            const [tablename, attributename] = option.join.get(val);
 
             sql+=`
             LEFT OUTER JOIN ${tablename} ON
@@ -255,28 +256,28 @@ export class MDBMS_SQLite extends MDBMS_DB{
     
     private check_valid_table(table:string,accesstype:number){
         this.sqlinjection(table)
-        if(table.startsWith('__') ) throw('[check_valid_table] table __로 시작')
-        if( !this.file[table]) throw(`[check_valid_table] table(${table}) 없어`)
-        if(typeof this.file[table] != 'object') throw('this.file[table] 객체아님')
-        const _table = this.file[table] as dbtable
+        // if(table.startsWith('__') ) throw('[check_valid_table] table __로 시작')
+        if( !this.file.data[table]) throw(`[check_valid_table] table(${table}) 없어`)
+        // if(typeof this.file.data[table] != 'object') throw('this.file[table] 객체아님')
+        const _table = this.file.data[table]
         if(!_table.__access || _table.__access[accesstype] != 'all') throw('[check_valid_table] 권한 없음 '+_table)
         return _table
     }
-    private check_modifiable_attribute(_table:dbtable|string,accesstype:number,attributename:string,value:any){
+    private check_modifiable_attribute(_table:Dbtable|string,accesstype:number,attributename:string,value:any){
         // 접근할 수 있는지 체크
         const _attribute = this.check_accessible_attribute(_table,accesstype,attributename)
 
         //notnull 체크
-        if(value==null && _attribute.__notnull) throw('notnull error'+attributename)
+        if(value==null && _attribute.notnull) throw('notnull error'+attributename)
         
         // __autoincrement 체크
-        if( _attribute.__autoincrement) throw('__autoincrement error'+attributename)
+        if( _attribute.autoincrement) throw('__autoincrement error'+attributename)
 
         //filiter체크
-        if(_attribute.__filiter) if(!_attribute.__filiter.test(String(value))) throw('_attribute.__filiter 만족 x '+_attribute.__filiter)
+        if(_attribute.filiter) if(!_attribute.filiter.test(String(value))) throw('_attribute.__filiter 만족 x '+_attribute.filiter)
         return _attribute
     }
-    private check_accessible_attribute(_table:dbtable|string, accesstype:number,attributename:string){
+    private check_accessible_attribute(_table:Dbtable|string, accesstype:number,attributename:string){
         this.sqlinjection(attributename)
         if(typeof _table =='string') _table = this.check_valid_table(_table, accesstype)
 
@@ -286,7 +287,7 @@ export class MDBMS_SQLite extends MDBMS_DB{
         const _attribute = get_attribute_from_table(_table, attributename)// _table[attributename]  as dbattribute
 
         //권한체크
-        if(_attribute.__access[1] != 'all') throw('권한 없음')
+        if(_attribute.access[1] != 'all') throw('권한 없음')
         return _attribute
     }
     // _table 과 _attribute 따루 주거나, _table 무시하고 _attribute가 [문자].[문자]형식일 떄,
@@ -309,7 +310,7 @@ export class MDBMS_SQLite extends MDBMS_DB{
         // if (_attribute.__type.toUpperCase() == 'NUMERIC') if(!['number','null'].includes(typeof attribute[attributename])) throw('type error INTEGER'+attributename)
     }
 
-    private is_unique_attribute(_table:string|dbtable, attribute:string[]){
+    private is_unique_attribute(_table:string|Dbtable, attribute:string[]){
         if(typeof _table =='string') _table = this.check_valid_table(_table, 1)
         const __table = _table
         // __primarykey 이거나 _unique 속성이 먹여야
@@ -319,8 +320,8 @@ export class MDBMS_SQLite extends MDBMS_DB{
         const __unique_attribute = []
         for(const key in __table) if(!key.startsWith('__')) {
             const at = get_attribute_from_table(__table, key)
-            if(at.__primarykey ) __prkey_attribute.push(key)
-            if(at.__unique) __unique_attribute.push(key)
+            if(at.primarykey ) __prkey_attribute.push(key)
+            if(at.unique) __unique_attribute.push(key)
         }
         
         // 모든 prkey가 있으면 ok
@@ -339,7 +340,7 @@ export class MDBMS_SQLite extends MDBMS_DB{
         for(const key in attribute){
             this.sqlinjection(key) // 표준보다 강력해지는것(?) 안 하면 골치아프다.
             const at =  this.check_accessible_attribute (table,1,key)
-            this.check_type_attribute(at.__type,attribute[key])
+            this.check_type_attribute(at.type,attribute[key])
             attribute_array.push(key)
             sql_dict['$'+key] = attribute[key]
         } 

@@ -2,7 +2,7 @@ import {IncomingMessage,ServerResponse } from 'http'
 // import * as sqlite3 from 'sqlite3'
 
 import {createpath,parse_pathname,is_string_array} from '../sort_functions'
-import {dbfile,getoption,getattribute, check_getoption, check_getattribute} from './mdbms_type'
+import {Dbfile,Getoption,getattribute, check_getattribute} from './mdbms_type'
 
 import {MDBMS_DB} from './mdbms_db'
 import {MDBMS_SQLite} from './mdbms_sqlite'
@@ -28,7 +28,7 @@ export class MBDMS{//Management System for DataBase Management System
                 if(!['__path','__dir'].includes(key)) throw('[parsesetting], key없음 '+key)
                 else continue
             }
-            const file = setting[key] as dbfile
+            const file = setting[key]// as dbfile
             if(typeof file.__type != 'string') throw(`[__tpye string 아님, file.__type:${file.__type}, key:${key}`) 
             const __type = file.__type.toLocaleLowerCase()
             if(__type=='sqlite'||__type=='sqlite3'){
@@ -63,7 +63,7 @@ export class MBDMS{//Management System for DataBase Management System
         const method = _method.toLocaleUpperCase()
         if(!['GET','POST','PUT','DELETE'].includes(method)) return false
         for (const file in this.dbmses){
-            if(this.dbmses[file].path == parse_pathname(url.pathname)) return file
+            if(this.dbmses[file].getpath == parse_pathname(url.pathname)) return file
         }
         return false
 
@@ -108,7 +108,7 @@ export class MBDMS{//Management System for DataBase Management System
             // }catch(e){rejects(`404 e:${e}`)}
         };
     })}
-    public async parsedohttp(res:ServerResponse,method:string,file:string|null,table:string|null,attribute:getattribute|null,where:getattribute|null|string[], option:null|getoption){
+    public async parsedohttp(res:ServerResponse,method:string,file:string|null,table:string|null,attribute:getattribute|null,where:getattribute|null|string[], option:null|Getoption){
         try{
             let data
 
@@ -117,7 +117,7 @@ export class MBDMS{//Management System for DataBase Management System
             switch (method){
                 case 'GET':
                     if(!Array.isArray(attribute) || !is_string_array(attribute)) throw('err attribure err')
-                    data = await this.get(file,table,attribute, check_getoption(option))
+                    data = await this.get(file,table,attribute, option==null?null:new Getoption(option))
                     break
                 case 'POST':
                     data = await this.post(file,table,check_getattribute(attribute))
@@ -141,7 +141,7 @@ export class MBDMS{//Management System for DataBase Management System
         }
     }
     
-    public get(file:string,table:string,attribute:string[], option:getoption|null=null){
+    public get(file:string,table:string,attribute:string[], option:Getoption|null=null){
         // this.setup()
         if(typeof this.dbmses[file] != 'object') throw('[get] this.dbmses[file] != object')
         return this.dbmses[file].get(table,attribute,option)
