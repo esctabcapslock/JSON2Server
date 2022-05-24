@@ -1,5 +1,7 @@
 import { is_string_array } from "../sort_functions"
 
+export  type stringobj = {[key:string]:any}
+
 type accesstype = [string, string,string,string]
 // export type dbsetting = {
 //     __path:string|undefined,__dir:string|undefined,
@@ -28,7 +30,7 @@ type accesstype = [string, string,string,string]
 // export type getjoin = {[key:string]:[string,string]} //Join {"table1.file1": [table2,field2], … }
 // export type getas = {[key:string]:string} //Join {"table1.file1": nickname, … }
 // export type getorder = {column:string,order:"ASC"|"DESC"} //Join {"table1.file1": [table2,field2], … }
-export type getattribute = {[key:string]:string|number|Buffer}
+// export type getattribute = {[key:string]:string|number|Buffer}
 export type sqlallout = {[key:string]:string|null|number}[]
 // {[key:string]:string|number|null}
 
@@ -186,65 +188,20 @@ export function get_attribute_from_table(_table:Dbtable, attributekey:string){
 // export type getorder = {column:string,order:"ASC"|"DESC"} //Join {"table1.file1": [table2,field2], … }
 // export type getattribute = {[key:string]:string|number}
 
-export function check_getattribute(obj:any):getattribute{
-    if (typeof obj !='object') throw('객체가 아님')
-    for (const key in obj){
-        if(typeof key != 'string') throw('key 문자가 아님')
-        if (!['string','number'].includes(typeof obj[key]) && !Buffer.isBuffer(obj[key])) throw('obj[key] 타입 다르다')
+
+export class Getattribute{
+    private dict:{[key:string]:string|number|Buffer}
+    constructor(obj:any){
+        if (typeof obj !='object') throw('객체가 아님')
+        for (const key in obj){
+            if(typeof key != 'string') throw('key 문자가 아님')
+            if (!['string','number'].includes(typeof obj[key]) && !Buffer.isBuffer(obj[key])) throw('obj[key] 타입 다르다')
+        }
+        this.dict = obj
     }
-    return obj
+    public get(key:string){return this.dict[key]}
+    public getlist(){return dictkeylist(this.dict)}
 }
-
-// export function check_getoption(obj:any):Getoption{
-//     if (typeof obj !='object') throw('객체가 아님')
-//     for (const key in obj){
-//         // if(!['join','as','limit','order'].includes(key)) 
-//         switch (key){
-//             case 'join':
-//                 if(typeof obj[key] != 'object' || obj[key] != undefined) throw(`${key} 타입 오류`)
-//                 if(typeof obj[key] == 'object') for(const joinkey in obj[key]){
-//                     if(typeof joinkey!= 'string') throw(`${key} 타입 오류`)
-//                     if( !(Array.isArray(obj[key][joinkey]) && is_string_array(obj[key][joinkey]) && obj[key][joinkey].length==2)) throw(`${key} 타입 오류`)
-//                 }
-//                 break
-//             case 'as':
-//                 if(typeof obj[key] != 'object' || obj[key] != undefined) throw(`${key} 타입 오류`)
-//                 if(typeof obj[key] == 'object') for(const joinkey in obj[key]){
-//                     if(typeof joinkey!= 'string') throw(`${key} 타입 오류`)
-//                     if(typeof obj[key][joinkey] != 'string') throw(`${key} 타입 오류`)
-//                 }
-//                 break
-//             case 'limit':
-//                 if (!(obj[key] == undefined || (Number.isInteger(obj[key]) && obj[key]>=0))) throw(`${key} 타입 오류`)
-//                 break
-//             case 'order':
-//                 if(typeof obj[key] != 'object' || obj[key] != undefined) throw(`${key} 타입 오류`)
-//                 if(typeof obj[key] == 'object') for(const joinkey in obj[key]){
-//                     switch (joinkey){
-//                         case 'column':
-//                             if(typeof obj[key][joinkey] != 'string') throw(`${key} 타입 오류`)
-//                             break
-//                         case 'order':
-//                             if(!["ASC","DESC"].includes(obj[key][joinkey])) throw(`${key} 타입 오류`)
-//                             break
-//                         default:
-//                             throw(`${key} 타입 오류`)
-//                     }
-//                 }
-//                 break
-//             default:
-//                 throw('값 없음, 이상한 키'+key)
-//         }
-//     }
-//     return obj
-// }
-
-// export type getoption = {join:undefined|getjoin, as:getas|undefined, limit:undefined|number, order:undefined|getorder}
-// export type getjoin = {[key:string]:[string,string]} //Join {"table1.file1": [table2,field2], … }
-// export type getas = {[key:string]:string} //Join {"table1.file1": nickname, … }
-// export type getorder = {column:string,order:"ASC"|"DESC"} //Join {"table1.file1": [table2,field2], … }
-// export type getattribute = {[key:string]:string|number|Buffer}
-// export type sqlallout = {[key:string]:string|null|number}[]
 
 export class Getoption{
     join:undefined|Getjoin
@@ -260,24 +217,14 @@ export class Getoption{
     constructor(obj:{[key:string]:any}){
     if (typeof obj !='object') throw('객체가 아님')
     for (const key in obj){
-        // if(!['join','as','limit','order'].includes(key)) 
         switch (key){
             case 'join':
                 if(typeof obj[key] != 'object' || obj[key] != undefined) throw(`${key} 타입 오류`)
-                if(typeof obj[key] == 'object') this.join = new Getjoin(obj[key])
-                else this.join = undefined
-                    // if(typeof joinkey!= 'string') throw(`${key} 타입 오류`)
-                    // if( !(Array.isArray(obj[key][joinkey]) && is_string_array(obj[key][joinkey]) && obj[key][joinkey].length==2)) throw(`${key} 타입 오류`)
-                // }
+                this.join = typeof obj[key] == 'object' ? new Getjoin(obj[key]) : undefined
                 break
             case 'as':
                 if(typeof obj[key] != 'object' || obj[key] != undefined) throw(`${key} 타입 오류`)
-                if(typeof obj[key] == 'object') this.as = new Getas(obj[key])
-                else this.as = undefined
-                // for(const joinkey in obj[key]){
-                //     if(typeof joinkey!= 'string') throw(`${key} 타입 오류`)
-                //     if(typeof obj[key][joinkey] != 'string') throw(`${key} 타입 오류`)
-                // }
+                this.as = typeof obj[key] == 'object' ? new Getas(obj[key]) : undefined
                 break
             case 'limit':
                 if (!(obj[key] == undefined || (Number.isInteger(obj[key]) && obj[key]>=0))) throw(`${key} 타입 오류`)
@@ -285,20 +232,7 @@ export class Getoption{
                 break
             case 'order':
                 if(typeof obj[key] != 'object' || obj[key] != undefined) throw(`${key} 타입 오류`)
-                if(typeof obj[key] == 'object') this.order = new Getorder(obj[key].column, obj[key].order)
-                else this.order = undefined
-                // for(const joinkey in obj[key]){
-                //     switch (joinkey){
-                //         case 'column':
-                //             if(typeof obj[key][joinkey] != 'string') throw(`${key} 타입 오류`)
-                //             break
-                //         case 'order':
-                //             if(!["ASC","DESC"].includes(obj[key][joinkey])) throw(`${key} 타입 오류`)
-                //             break
-                //         default:
-                //             throw(`${key} 타입 오류`)
-                //     }
-                // }
+                this.order = typeof obj[key] == 'object' ? new Getorder(obj[key].column, obj[key].order):undefined
                 break
             default:
                 throw('값 없음, 이상한 키'+key)
@@ -311,20 +245,15 @@ export class Getjoin{
     constructor(dict:{[key:string]:[string,string]}){
         this.__data = {}
         for(const key in dict)this.set(key,dict[key])
-        
         // {[key:string]:[string,string]} //Join {"table1.file1": [table2,field2], … }
     }
     public get(key:string){return this.__data[key]}
+    public getlist(){return dictkeylist(this.__data)}
     public set(key:string, data:[string,string]){
-        if(typeof key != 'string') throw('Getjoin error')
+        if(typeof key != 'string' || key==="") throw('Getjoin error')
         if(key.split('.').length>2) throw('Getjoin .이 많음 error')
         if(is_string_array(data) && data.length==2) this.__data[key] = data
         else throw('Getjoin error2')
-    }
-    public getlist(){
-        const out:string[] = []
-        for(let key in this.__data) out.push(key)
-        return out
     }
 }
 export class Getas{
@@ -337,25 +266,27 @@ export class Getas{
         // {[key:string]:[string,string]} //Join {"table1.file1": [table2,field2], … }
     }
     public get(key:string){return this.__data[key]}
+    public getlist(){return dictkeylist(this.__data)}
     public set(key:string, data:string){
-        if(typeof key != 'string') throw('Getas error')
+        if(typeof key != 'string' || key==="") throw('Getas error')
         if(key.split('.').length>2) throw('Getas .이 많음 error')
         if(is_string_array(data) && data.length==2) this.__data[key] = data
         else throw('Getjoin error2')
-    }
-    public getlist(){
-        const out:string[] = []
-        for(let key in this.__data) out.push(key)
-        return out
     }
 }
 
 export class Getorder{
     column:string;order:"ASC"|"DESC" //Join {"table1.file1": [table2,field2], … }
     constructor(column:string,order:"ASC"|"DESC"){
-        if(typeof column != 'string') throw('error column')
+        if(typeof column != 'string' || column==="") throw('error column')
          this.column = column
          if(order!="ASC" && order!="DESC") throw("Getorder error")
          this.order = order
      }
+}
+
+function dictkeylist(obj:stringobj){
+    const out:string[] = []
+    for(let key in obj) out.push(key)
+    return out
 }

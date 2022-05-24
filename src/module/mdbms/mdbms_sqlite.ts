@@ -1,6 +1,6 @@
 import {sqlite3,Database} from 'sqlite3'
 import {MDBMS_DB} from './mdbms_db'
-import {Dbtable,Dbattribute,Getoption,getattribute,sqlallout,get_attribute_from_table} from './mdbms_type'
+import {Dbtable,Dbattribute,Getoption,Getattribute,sqlallout,get_attribute_from_table, stringobj} from './mdbms_type'
 import {check_string_array, is_string_array} from '../sort_functions'
 
 export class MDBMS_SQLite extends MDBMS_DB{
@@ -105,61 +105,28 @@ export class MDBMS_SQLite extends MDBMS_DB{
         return true
     }
     //데이터 읽기
-    public async get(table:string,attribute:string[], option:Getoption|null=null){
-        // this.setup()
+    public async get(table:string,attribute:string[],  where:Getattribute|null=null, option:Getoption|null=null){
         // option  조건:
         //attribute에 있어야 함.
         if(!option) option = new Getoption({join:undefined,limit:undefined,as:undefined,order:undefined}) //{join:undefined,limit:undefined,as:undefined,order:undefined}
-        let sql = `SELECT`
-        // const field:string[] = [] 
-
-        // const req_attribute = []
-
-        // 테이블 가능 확인
-        this.check_valid_table(table,1)
-
+        
         try{
+            // 테이블 가능 확인
+            this.check_valid_table(table,1)
             // 속성을 요청했는지 확인
             if(!is_string_array(attribute) || attribute.length==0) throw(`table:${table} attribute 길이가 0이거나 배열이 아님`)
-
             // 접근 가능한 속성인지 확인
             for (const val of attribute) this.check_accessible_attribute_with_dot(table,val) //) req_attribute.push(val)
-                
-            // join의 값들 유효성 확인
-            if (option.join) if(!option.join.getlist().every(val=>{
-                if(!option || !option.join) throw('뭔기 이상함');
-                if (!val.includes('')) throw('option join key 유효X 문자')
-                this.check_accessible_attribute_with_dot('',val)
-                const [tablename, attributename] = option.join?.get(val)
-                this.check_valid_table(tablename, 1)
-                this.check_accessible_attribute(tablename, 1, attributename)
-            })) throw('option join 유효X')
-            
-            //as의 값들 유효성 확인
-            if (option.as) if(!option.as.getlist().every(val=>{
-                if(!option || !option.as) throw('뭔기 이상함');
-                if (!val.includes('')) throw('option as key 유효X 문자')
-                this.check_accessible_attribute_with_dot('',val)
-                this.sqlinjection(option.as.get(val))
-            })) throw('option as 유효X')
-
-            if (!option.limit && this.quarylimit) option.limit = this.quarylimit
-            if (Number.isInteger(!option.limit)) throw('limit 잘못됨')
-
-            if(option.order){
-                this.check_accessible_attribute_with_dot(table,option.order.column)
-                if(!["ASC","DESC"].includes(option.order.order)) throw("opt oredr 잘못됨")
-            }
-
             // option
-
+            this.check_accessible_getoption(table,option)
         }catch(e){
             throw(`400 [sqlite db get] 요청사항의 문제. e:${e}`)
         }
 
-            
-        //sql문 생성
+        const [where_array, where_sql_dict] = where!=null ? this.check_getattribute_where(table,where,false) : [[],{}];
 
+        //sql문 생성
+        let sql = `SELECT`
         sql += ' ' + attribute.map(v=> {
             if(option?.as && v in option.as) return `${v} AS ${option.as.get(v)}`  
             else return v
@@ -170,44 +137,29 @@ export class MDBMS_SQLite extends MDBMS_DB{
 
             sql+=`
             LEFT OUTER JOIN ${tablename} ON
-            ${val} = ${tablename}.${attributename}`
+            ${val} = ${tablename}.${attributename}
+            `
+            
         }
         if(option.limit) sql += `\nlimit ${option.limit}`
         if(option.order) sql += `\n ORDER BY ${option.order.column} ${option.order.order}`
+        if(where) sql += `${where_array.map(v=>`${v}=$${v}`).join(' AND ')}` // 등호 1개 맞음
 
-        // ORDER BY [attribute] [DESC|ASC|
-
-        // if(!field.length) throw(`길이X field:${field}`)
-        // sql+=`${field.join(',')} WHERE `
 
         // whele문 작성
 
-
         // 실행
-        const insert_out = await this.getdb(sql,{})
+        const insert_out = await this.getdb(sql,where_sql_dict)
         console.log('[insert_out],',insert_out)
         return insert_out
         // 아마 반환하는거 타입이 {[key:string]:string|null|number}[]일텐데... 확실하지 않네?
     }
     //데이터 추가
-    public async post(table:string,attribute:getattribute, option:null=null){
+    public async post(table:string,attribute:Getattribute, option:null=null){
         const _table = this.check_valid_table(table,1)
 
         const [attribute_array, attribute_dict] = this.check_getattribute(table,attribute)
 
-        // let cnt = 0
-        // const attribute_array = []
-        // const attribute_dict:getattribute = {}
-
-
-        // for (const attributename in attribute){
-        //     const _attribute = this.check_modifiable_attribute(_table,1,attributename,attribute[attributename])
-        //     this.check_type_attribute(_attribute.__type, attribute[attributename]) //타입체크
-        //     cnt+=1
-        //     attribute_array.push(attributename)
-        //     attribute_dict[`$${cnt}`] = attribute[attributename]
-        // }
-        // const sql = `INSERT INTO ${this.sqlinjection(table)}  (${attribute_array.join(', ')}) VALUES(${(Array(cnt)).fill(0).map((v,i)=>`$${i+1}`).join(',')});`
         const sql = `INSERT INTO ${this.sqlinjection(table)}
                      (${attribute_array.join(', ')}) VALUES(${attribute_array.map(v=>`$`+v).join(',')});`
         const insert_out = await this.getdb(sql,attribute_dict)
@@ -215,14 +167,11 @@ export class MDBMS_SQLite extends MDBMS_DB{
         // 그 밖에 notnull 배먹은 키는 sql이 잘 거르겠지??
         // 타입체크하기
         // 접근 가능하면
-
-    
-        
     }
     //데이터 수정
-    public async put(table:string,attribute:getattribute,where:getattribute, option:null=null){
+    public async put(table:string,attribute:Getattribute,where:Getattribute, option:null=null){
        
-        const [where_array, sql_dict1] = this.check_getattribute_where(table,where)
+        const [where_array, sql_dict1] = this.check_getattribute_where(table,where,true)
         const [attribute_array, sql_dict2] = this.check_getattribute(table,attribute)
 
         // UPDATE table_name
@@ -237,8 +186,8 @@ export class MDBMS_SQLite extends MDBMS_DB{
 
     }
     //데이터 삭제
-    public async delete(table:string,where:getattribute, option:null=null){
-        const [where_array, sql_dict] = this.check_getattribute_where(table,where)
+    public async delete(table:string,where:Getattribute, option:null=null){
+        const [where_array, sql_dict] = this.check_getattribute_where(table,where,true)
 
         if(!this.is_unique_attribute(table,where_array)) throw('[delete] error')
         const sql = `DELETE FROM ${this.sqlinjection(table)}
@@ -334,23 +283,49 @@ export class MDBMS_SQLite extends MDBMS_DB{
     }
     
     // 유효간 속성인지 확인
-    private check_getattribute(table:string, attribute:getattribute):[string[], getattribute]{
+    private check_getattribute(table:string, attribute:Getattribute):[string[], stringobj]{
         const attribute_array:string[] = []
-        const sql_dict:getattribute = {}
-        for(const key in attribute){
+        const sql_dict:stringobj = {}
+        for(const key of attribute.getlist()){
             this.sqlinjection(key) // 표준보다 강력해지는것(?) 안 하면 골치아프다.
             const at =  this.check_accessible_attribute (table,1,key)
-            this.check_type_attribute(at.type,attribute[key])
+            this.check_type_attribute(at.type,attribute.get(key))
             attribute_array.push(key)
-            sql_dict['$'+key] = attribute[key]
+            sql_dict['$'+key] = attribute.get(key)
         } 
         return [attribute_array,sql_dict]
     }
 
     // check_getattribute 실행하고, attribute가 단 하나의 래코드를 가리키는지 확인
-    private check_getattribute_where(table:string, attribute:getattribute):[string[], getattribute]{
+    // sql whehe문에 사용하기 위한거임
+    private check_getattribute_where(table:string, attribute:Getattribute, unique:boolean):[string[], stringobj]{
         const [attribute_array,sql_dict] = this.check_getattribute(table,attribute)
-        if(!this.is_unique_attribute(table,attribute_array)) throw(`check_getattribute_where error table:${table} attribute:${attribute}`)
+        if(unique) if(!this.is_unique_attribute(table,attribute_array)) throw(`check_getattribute_where error table:${table} attribute:${attribute}`)
         return [attribute_array,sql_dict]
+    }
+    private check_accessible_getoption(table:string,option:Getoption){ 
+        // join의 값들 유효성 확인
+        if (option.join) if(!option.join.getlist().every(val=>{
+            if(!option || !option.join) throw('뭔기 이상함');
+            this.check_accessible_attribute_with_dot(table,val)
+            const [tablename, attributename] = option.join?.get(val)
+            this.check_valid_table(tablename, 1)
+            this.check_accessible_attribute(tablename, 1, attributename)
+        })) throw('option join 유효X')
+        
+        //as의 값들 유효성 확인
+        if (option.as) if(!option.as.getlist().every(val=>{
+            if(!option || !option.as) throw('뭔기 이상함');
+            this.check_accessible_attribute_with_dot(table,val)
+            this.sqlinjection(option.as.get(val))
+        })) throw('option as 유효X')
+
+        if (!option.limit && this.quarylimit) option.limit = this.quarylimit
+        if (Number.isInteger(!option.limit)) throw('limit 잘못됨')
+
+        if(option.order){
+            this.check_accessible_attribute_with_dot(table,option.order.column)
+            // if(!["ASC","DESC"].includes(option.order.order)) throw("opt oredr 잘못됨")
+        }
     }
 }

@@ -1,4 +1,4 @@
-import {Dbfile,Dbtable,Dbattribute,Getoption,getattribute,sqlallout} from './mdbms_type'
+import {Dbfile,Dbtable,Dbattribute,Getoption,Getattribute,sqlallout} from './mdbms_type'
 import {parse_connect_pathname,createpath} from '../sort_functions'
 
 export class MDBMS_DB{
@@ -87,20 +87,20 @@ export class MDBMS_DB{
 
 
     //데이터 읽기
-    public async get(table:string,attribute:string[], option:Getoption|null=null):Promise<sqlallout>{
+    public async get(table:string,attribute:string[], where:Getattribute|null=null,option:Getoption|null=null):Promise<sqlallout>{
         // this.setup()
         return []
     }
     //데이터 추가
-    public async post(table:string,attribute:getattribute, option:null=null){
+    public async post(table:string,attribute:Getattribute, option:null=null){
 
     }
     //데이터 수정
-    public async put(table:string,attribute:getattribute,where:getattribute, option:null=null){
+    public async put(table:string,attribute:Getattribute,where:Getattribute, option:null=null){
 
     }
     //데이터 삭제
-    public async delete(table:string,where:getattribute, option:null=null){
+    public async delete(table:string,where:Getattribute, option:null=null){
 
     }
 }

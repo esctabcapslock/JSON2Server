@@ -2,7 +2,7 @@ import {IncomingMessage,ServerResponse } from 'http'
 // import * as sqlite3 from 'sqlite3'
 
 import {createpath,parse_pathname,is_string_array} from '../sort_functions'
-import {Dbfile,Getoption,getattribute, check_getattribute} from './mdbms_type'
+import {stringobj,Getoption, Getattribute} from './mdbms_type'
 
 import {MDBMS_DB} from './mdbms_db'
 import {MDBMS_SQLite} from './mdbms_sqlite'
@@ -108,7 +108,7 @@ export class MBDMS{//Management System for DataBase Management System
             // }catch(e){rejects(`404 e:${e}`)}
         };
     })}
-    public async parsedohttp(res:ServerResponse,method:string,file:string|null,table:string|null,attribute:getattribute|null,where:getattribute|null|string[], option:null|Getoption){
+    public async parsedohttp(res:ServerResponse,method:string,file:string|null,table:string|null,attribute:stringobj|null,where:stringobj|null, option:null|stringobj){
         try{
             let data
 
@@ -117,16 +117,16 @@ export class MBDMS{//Management System for DataBase Management System
             switch (method){
                 case 'GET':
                     if(!Array.isArray(attribute) || !is_string_array(attribute)) throw('err attribure err')
-                    data = await this.get(file,table,attribute, option==null?null:new Getoption(option))
+                    data = await this.get(file,table,attribute, where==null?null:new Getattribute(where), option==null?null:new Getoption(option))
                     break
                 case 'POST':
-                    data = await this.post(file,table,check_getattribute(attribute))
+                    data = await this.post(file,table,new Getattribute(attribute))
                     break
                 case 'PUT':
-                    data = await this.put(file,table,check_getattribute(attribute), check_getattribute(where))
+                    data = await this.put(file,table,new Getattribute(attribute), new Getattribute(where))
                     break
                 case 'DELETE':
-                    data = await this.delete(file,table,check_getattribute(where))
+                    data = await this.delete(file,table,new Getattribute(where))
                     break
                 default:
                     throw('[err] parsehttp '+method)
@@ -141,29 +141,25 @@ export class MBDMS{//Management System for DataBase Management System
         }
     }
     
-    public get(file:string,table:string,attribute:string[], option:Getoption|null=null){
+    public get(file:string,table:string,attribute:string[],  where:Getattribute|null=null, option:Getoption|null=null){
         // this.setup()
         if(typeof this.dbmses[file] != 'object') throw('[get] this.dbmses[file] != object')
-        return this.dbmses[file].get(table,attribute,option)
+        return this.dbmses[file].get(table,attribute,where, option)
     }
     //데이터 추가
     // public post(file:string,table:string,attribute:string, option:any|undefined){
-    public async post(file:string,table:string,attribute:getattribute, option:null=null){
+    public async post(file:string,table:string,attribute:Getattribute, option:null=null){
         if(typeof this.dbmses[file] != 'object') throw('[get] this.dbmses[file] != object')
         return this.dbmses[file].post(table,attribute,option)
     }
     //데이터 수정
-    public put(file:string,table:string,attribute:getattribute,where:getattribute, option:null=null){
+    public put(file:string,table:string,attribute:Getattribute,where:Getattribute, option:null=null){
         if(typeof this.dbmses[file] != 'object') throw('[get] this.dbmses[file] != object')
         return this.dbmses[file].put(table,attribute,where,option)
     }
     //데이터 삭제
-    public delete(file:string,table:string,where:getattribute, option:null=null){
+    public delete(file:string,table:string,where:Getattribute, option:null=null){
         if(typeof this.dbmses[file] != 'object') throw('[get] this.dbmses[file] != object')
         return this.dbmses[file].delete(table,where,option)
     }
-
-     
 }
-
-
