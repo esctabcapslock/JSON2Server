@@ -29,7 +29,7 @@ class Path {
         let root = this.path_dict;
         for (const dir of path_arr) {
             isallow ? root.__allow.push(dir) : root.__disallow.push(dir);
-            if (root[dir] == undefined)
+            if (root[dir] === undefined)
                 root[dir] = (0, path_type_1.create_path_dict)();
             else if (root[dir]) {
                 if (typeof root[dir] != 'object')
@@ -125,7 +125,7 @@ class Path {
             if (path_arr.some(v => v.startsWith('__')))
                 throw ('400 폴더 중 __으로 시작하는게 있음');
             const file_name = path_arr.pop();
-            if (file_name == undefined)
+            if (file_name === undefined)
                 throw ('400 [application_path] does not file_name exist');
             let root = this.path_dict;
             let filepath = (0, sort_functions_1.parse_pathname)(this.path_dict.__dir ? this.path_dict.__dir : ''); //파일이 저장된 위치

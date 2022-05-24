@@ -20,9 +20,9 @@ class MDBMS_SQLite extends mdbms_db_1.MDBMS_DB {
         super(key, path, dir, file);
         this.sqlite3 = require('sqlite3').verbose();
         // this.__dir = '/'+this.__dir
-        console.log('[this.__dir] - MDBMS_SQLite', __dirname, this.__dir);
+        console.log('[this.__dir] - MDBMS_SQLite', __dirname, this.dir);
         require('fs').writefile;
-        this.db = new this.sqlite3.Database(this.__dir);
+        this.db = new this.sqlite3.Database(this.dir);
         this.setup();
     }
     getdb(sql, obj) {
@@ -40,10 +40,10 @@ class MDBMS_SQLite extends mdbms_db_1.MDBMS_DB {
         return __awaiter(this, void 0, void 0, function* () {
             if (!this.db)
                 return false;
-            console.log('setting]t his.__dir', this.__dir);
+            console.log('setting]t his.__dir', this.dir);
             if (!this.sqlite3)
                 this.sqlite3 = require('sqlite3').verbose();
-            console.log('setting]t his.__dir2', this.__dir);
+            console.log('setting]t his.__dir2', this.dir);
             //db.serialize(async () => {
             const table_list = yield this.getdb("SELECT * FROM sqlite_master WHERE type='table'", {});
             console.log('[table_list],', table_list);
@@ -61,39 +61,38 @@ class MDBMS_SQLite extends mdbms_db_1.MDBMS_DB {
                 // 대충 다음 버전에서 사라질 수 있다는 뜻. 호환 부족함 
                 //console.log('[table_info]',$tablename,table_info,)
             }
-            for (const tablename in this.file)
+            for (const tablename in this.file.data)
                 if (!tablename.startsWith('__')) {
                     //console.log('[this.file[tablename]',tablename,this.file[tablename])
                     if (!exist_table_names.includes(tablename)) {
-                        const _table = this.file[tablename];
+                        const _table = this.file.data[tablename];
                         const create_sql_bytable = (tablename, table) => {
                             let out = `CREATE TABLE "${this.sqlinjection(tablename)}"(\n`;
                             const attribute_sql_list = [];
-                            for (const attributename in table)
-                                if (!attributename.startsWith('__')) {
-                                    console.log('[table[attributename]', attributename, table[attributename]);
-                                    attribute_sql_list.push(create_sql_by_attribute(attributename, (0, mdbms_type_1.get_attribute_from_table)(table, attributename)));
-                                }
+                            for (const attributename in table.data) { //if(!attributename.startsWith('__'))
+                                console.log('[table[attributename]', attributename, table.data[attributename]);
+                                attribute_sql_list.push(create_sql_by_attribute(attributename, table.get_attribute(attributename)));
+                            }
                             out += attribute_sql_list.join(',\n') + '\n)';
                             console.log('[create_sql_bytable]', out);
                             return out;
                         };
                         const create_sql_by_attribute = (attributename, attribute) => {
-                            let out = `"${this.sqlinjection(attributename)}"    ${this.sqlinjection(attribute.__type.toUpperCase())} `;
+                            let out = `"${this.sqlinjection(attributename)}"    ${this.sqlinjection(attribute.type.toUpperCase())} `;
                             const settings = [];
-                            if (attribute.__primarykey)
+                            if (attribute.primarykey)
                                 settings.push('PRIMARY KEY');
-                            if (attribute.__autoincrement)
+                            if (attribute.autoincrement)
                                 settings.push('AUTOINCREMENT');
-                            if (attribute.__default)
-                                settings.push('DEFAULT ' + (typeof attribute.__default == 'number') ? attribute.__default :
-                                    (attribute.__default == 'null' || attribute.__default == null) ? 'null' : `"${this.sqlinjection(attribute.__default)}"`);
-                            if (attribute.__unique)
+                            if (attribute.default)
+                                settings.push('DEFAULT ' + (typeof attribute.default == 'number') ? attribute.default :
+                                    (attribute.default == 'null' || attribute.default == null) ? 'null' : `"${this.sqlinjection(attribute.default)}"`);
+                            if (attribute.unique)
                                 settings.push('UNIQUE');
-                            if (attribute.__notnull)
+                            if (attribute.notnull)
                                 settings.push('NOT NULL');
-                            if (attribute.__check)
-                                settings.push(`CHECK ${this.sqlinjection(attribute.__check)}`);
+                            if (attribute.check)
+                                settings.push(`CHECK ${this.sqlinjection(attribute.check)}`);
                             return out + settings.join(' ');
                         };
                         const createdbout = yield this.getdb(create_sql_bytable(tablename, _table), {});
@@ -118,81 +117,53 @@ class MDBMS_SQLite extends mdbms_db_1.MDBMS_DB {
         });
     }
     //데이터 읽기
-    get(table, attribute, option = null) {
+    get(table, attribute, where = null, option = null) {
         return __awaiter(this, void 0, void 0, function* () {
-            // this.setup()
             // option  조건:
             //attribute에 있어야 함.
             if (!option)
-                option = { join: undefined, limit: undefined, as: undefined, order: undefined };
-            let sql = `SELECT`;
-            // const field:string[] = [] 
-            // const req_attribute = []
+                option = new mdbms_type_1.Getoption({ join: undefined, limit: undefined, as: undefined, order: undefined }); //{join:undefined,limit:undefined,as:undefined,order:undefined}
             // 테이블 가능 확인
-            this.check_valid_table(table, 1);
+            const _table = this.file.tablestring2table(table).check_valid_table(1);
             try {
                 // 속성을 요청했는지 확인
                 if (!(0, sort_functions_1.is_string_array)(attribute) || attribute.length == 0)
                     throw (`table:${table} attribute 길이가 0이거나 배열이 아님`);
                 // 접근 가능한 속성인지 확인
                 for (const val of attribute)
-                    this.check_accessible_attribute_with_dot(table, val); //) req_attribute.push(val)
-                // join의 값들 유효성 확인
-                if (option.join)
-                    for (const val in option.join) {
-                        if (!val.includes(''))
-                            throw ('option join key 유효X 문자');
-                        this.check_accessible_attribute_with_dot('', val);
-                        const [tablename, attributename] = option.join[val];
-                        this.check_valid_table(tablename, 1);
-                        this.check_accessible_attribute(tablename, 1, attributename);
-                    }
-                //as의 값들 유효성 확인
-                if (option.as)
-                    for (const val in option.as) {
-                        if (!val.includes(''))
-                            throw ('option as key 유효X 문자');
-                        this.check_accessible_attribute_with_dot('', val);
-                        this.sqlinjection(option.as[val]);
-                    }
-                if (!option.limit && this.__quarylimit)
-                    option.limit = this.__quarylimit;
-                if (Number.isInteger(!option.limit))
-                    throw ('limit 잘못됨');
-                if (option.order) {
-                    this.check_accessible_attribute_with_dot(table, option.order.column);
-                    if (!["ASC", "DESC"].includes(option.order.order))
-                        throw ("opt oredr 잘못됨");
-                }
-                // option
+                    this.file.check_accessible_attribute_with_dot(table, val, this.sqlinjection); //) req_attribute.push(val)
+                // option 유효성 확인
+                this.file.check_accessible_getoption(table, option, this.sqlinjection);
             }
             catch (e) {
                 throw (`400 [sqlite db get] 요청사항의 문제. e:${e}`);
             }
+            const [where_array, where_sql_dict] = where != null ? _table.check_getattribute_where(where, false, this.sqlinjection, this.check_type_attribute) : [[], {}];
             //sql문 생성
+            let sql = `SELECT`;
             sql += ' ' + attribute.map(v => {
                 if ((option === null || option === void 0 ? void 0 : option.as) && v in option.as)
-                    return `${v} AS ${option.as[v]}`;
+                    return `${v} AS ${option.as.get(v)}`;
                 else
                     return v;
             }).join(',') + ` FROM ${table}`;
             if (option.join)
                 for (const val in option.join) {
-                    const [tablename, attributename] = option.join[val];
+                    const [tablename, attributename] = option.join.get(val);
                     sql += `
             LEFT OUTER JOIN ${tablename} ON
-            ${val} = ${tablename}.${attributename}`;
+            ${val} = ${tablename}.${attributename}
+            `;
                 }
             if (option.limit)
                 sql += `\nlimit ${option.limit}`;
             if (option.order)
                 sql += `\n ORDER BY ${option.order.column} ${option.order.order}`;
-            // ORDER BY [attribute] [DESC|ASC|
-            // if(!field.length) throw(`길이X field:${field}`)
-            // sql+=`${field.join(',')} WHERE `
+            if (where)
+                sql += `${where_array.map(v => `${v}=$${v}`).join(' AND ')}`; // 등호 1개 맞음
             // whele문 작성
             // 실행
-            const insert_out = yield this.getdb(sql, {});
+            const insert_out = yield this.getdb(sql, where_sql_dict);
             console.log('[insert_out],', insert_out);
             return insert_out;
             // 아마 반환하는거 타입이 {[key:string]:string|null|number}[]일텐데... 확실하지 않네?
@@ -201,19 +172,8 @@ class MDBMS_SQLite extends mdbms_db_1.MDBMS_DB {
     //데이터 추가
     post(table, attribute, option = null) {
         return __awaiter(this, void 0, void 0, function* () {
-            const _table = this.check_valid_table(table, 1);
-            const [attribute_array, attribute_dict] = this.check_getattribute(table, attribute);
-            // let cnt = 0
-            // const attribute_array = []
-            // const attribute_dict:getattribute = {}
-            // for (const attributename in attribute){
-            //     const _attribute = this.check_modifiable_attribute(_table,1,attributename,attribute[attributename])
-            //     this.check_type_attribute(_attribute.__type, attribute[attributename]) //타입체크
-            //     cnt+=1
-            //     attribute_array.push(attributename)
-            //     attribute_dict[`$${cnt}`] = attribute[attributename]
-            // }
-            // const sql = `INSERT INTO ${this.sqlinjection(table)}  (${attribute_array.join(', ')}) VALUES(${(Array(cnt)).fill(0).map((v,i)=>`$${i+1}`).join(',')});`
+            const _table = this.file.tablestring2table(table).check_valid_table(1);
+            const [attribute_array, attribute_dict] = _table.check_getattribute(attribute, this.sqlinjection, this.check_type_attribute);
             const sql = `INSERT INTO ${this.sqlinjection(table)}
                      (${attribute_array.join(', ')}) VALUES(${attribute_array.map(v => `$` + v).join(',')});`;
             const insert_out = yield this.getdb(sql, attribute_dict);
@@ -226,8 +186,9 @@ class MDBMS_SQLite extends mdbms_db_1.MDBMS_DB {
     //데이터 수정
     put(table, attribute, where, option = null) {
         return __awaiter(this, void 0, void 0, function* () {
-            const [where_array, sql_dict1] = this.check_getattribute_where(table, where);
-            const [attribute_array, sql_dict2] = this.check_getattribute(table, attribute);
+            const _table = this.file.tablestring2table(table).check_valid_table(1);
+            const [where_array, sql_dict1] = _table.check_getattribute_where(where, true, this.sqlinjection, this.check_type_attribute);
+            const [attribute_array, sql_dict2] = _table.check_getattribute(attribute, this.sqlinjection, this.check_type_attribute);
             // UPDATE table_name
             // SET column1 = value1, column2 = value2, ...
             // WHERE condition; 
@@ -241,8 +202,10 @@ class MDBMS_SQLite extends mdbms_db_1.MDBMS_DB {
     //데이터 삭제
     delete(table, where, option = null) {
         return __awaiter(this, void 0, void 0, function* () {
-            const [where_array, sql_dict] = this.check_getattribute_where(table, where);
-            if (!this.is_unique_attribute(table, where_array))
+            const _table = this.file.tablestring2table(table).check_valid_table(1);
+            const [where_array, sql_dict] = _table.check_getattribute_where(where, true, this.sqlinjection, this.check_type_attribute);
+            const __table = this.file.tablestring2table(table).check_valid_table(1);
+            if (!__table.is_unique_attribute(where_array))
                 throw ('[delete] error');
             const sql = `DELETE FROM ${this.sqlinjection(table)}
                      WHERE ${where_array.map(v => `${v}=$${v}`).join(' AND ')}`; // 등호 1개 맞음
@@ -255,63 +218,6 @@ class MDBMS_SQLite extends mdbms_db_1.MDBMS_DB {
         if (/\s|"|'|=|\*|\n|\r|\.|\,|\(|\)|\{|\}\[|\]|\||\&|\^|\%|\$|\!/.test(str))
             throw ('[sqlinjection] err sql not inval');
         return str;
-    }
-    check_valid_table(table, accesstype) {
-        this.sqlinjection(table);
-        if (table.startsWith('__'))
-            throw ('[check_valid_table] table __로 시작');
-        if (!this.file[table])
-            throw (`[check_valid_table] table(${table}) 없어`);
-        if (typeof this.file[table] != 'object')
-            throw ('this.file[table] 객체아님');
-        const _table = this.file[table];
-        if (!_table.__access || _table.__access[accesstype] != 'all')
-            throw ('[check_valid_table] 권한 없음 ' + _table);
-        return _table;
-    }
-    check_modifiable_attribute(_table, accesstype, attributename, value) {
-        // 접근할 수 있는지 체크
-        const _attribute = this.check_accessible_attribute(_table, accesstype, attributename);
-        //notnull 체크
-        if (value == null && _attribute.__notnull)
-            throw ('notnull error' + attributename);
-        // __autoincrement 체크
-        if (_attribute.__autoincrement)
-            throw ('__autoincrement error' + attributename);
-        //filiter체크
-        if (_attribute.__filiter)
-            if (!_attribute.__filiter.test(String(value)))
-                throw ('_attribute.__filiter 만족 x ' + _attribute.__filiter);
-        return _attribute;
-    }
-    check_accessible_attribute(_table, accesstype, attributename) {
-        this.sqlinjection(attributename);
-        if (typeof _table == 'string')
-            _table = this.check_valid_table(_table, accesstype);
-        // if(attributename.startsWith('__')) throw('attributename __로 시작'+attributename)
-        // if(!_table[attributename]) throw('attributename __로 시작'+attributename)
-        // if(typeof _table[attributename] != 'object') throw('_table[attributename] 객체아님'+attributename)
-        const _attribute = (0, mdbms_type_1.get_attribute_from_table)(_table, attributename); // _table[attributename]  as dbattribute
-        //권한체크
-        if (_attribute.__access[1] != 'all')
-            throw ('권한 없음');
-        return _attribute;
-    }
-    // _table 과 _attribute 따루 주거나, _table 무시하고 _attribute가 [문자].[문자]형식일 떄,
-    check_accessible_attribute_with_dot(_table, _attribute) {
-        if (!_table && !_attribute.includes('.'))
-            throw ('_attribute에 점이 없음');
-        if (_attribute.includes('.')) {
-            const [tablename, attributename] = _attribute.split('.');
-            if (this.check_accessible_attribute(this.sqlinjection(tablename), 1, this.sqlinjection(attributename)))
-                return true;
-            else
-                false;
-        }
-        else if (this.check_accessible_attribute(_table, 1, this.sqlinjection(_attribute)))
-            return true;
-        else
-            return false;
     }
     check_type_attribute(type, value) {
         if (type == 'INTEGER') {
@@ -332,50 +238,6 @@ class MDBMS_SQLite extends mdbms_db_1.MDBMS_DB {
         }
         return true;
         // if (_attribute.__type.toUpperCase() == 'NUMERIC') if(!['number','null'].includes(typeof attribute[attributename])) throw('type error INTEGER'+attributename)
-    }
-    is_unique_attribute(_table, attribute) {
-        if (typeof _table == 'string')
-            _table = this.check_valid_table(_table, 1);
-        const __table = _table;
-        // __primarykey 이거나 _unique 속성이 먹여야
-        // __unique
-        const __prkey_attribute = [];
-        const __unique_attribute = [];
-        for (const key in __table)
-            if (!key.startsWith('__')) {
-                const at = (0, mdbms_type_1.get_attribute_from_table)(__table, key);
-                if (at.__primarykey)
-                    __prkey_attribute.push(key);
-                if (at.__unique)
-                    __unique_attribute.push(key);
-            }
-        // 모든 prkey가 있으면 ok
-        if (__prkey_attribute.every(v => attribute.includes(v)))
-            return true;
-        // 하나의 uniqukey가 있어도 ok
-        if (__unique_attribute.some(v => attribute.includes(v)))
-            return true;
-        return false;
-    }
-    // 유효간 속성인지 확인
-    check_getattribute(table, attribute) {
-        const attribute_array = [];
-        const sql_dict = {};
-        for (const key in attribute) {
-            this.sqlinjection(key); // 표준보다 강력해지는것(?) 안 하면 골치아프다.
-            const at = this.check_accessible_attribute(table, 1, key);
-            this.check_type_attribute(at.__type, attribute[key]);
-            attribute_array.push(key);
-            sql_dict['$' + key] = attribute[key];
-        }
-        return [attribute_array, sql_dict];
-    }
-    // check_getattribute 실행하고, attribute가 단 하나의 래코드를 가리키는지 확인
-    check_getattribute_where(table, attribute) {
-        const [attribute_array, sql_dict] = this.check_getattribute(table, attribute);
-        if (!this.is_unique_attribute(table, attribute_array))
-            throw (`check_getattribute_where error table:${table} attribute:${attribute}`);
-        return [attribute_array, sql_dict];
     }
 }
 exports.MDBMS_SQLite = MDBMS_SQLite;

@@ -46,20 +46,62 @@ export type sqlallout = {[key:string]:string|null|number}[]
 //     return out
 // }
 export class Dbfile{
-    __path:string|undefined;
-    __dir:string|undefined;
-    __type:string;
-    __crossorigin:string|undefined
-    __quarylimit:number|undefined
+    path:string|undefined;
+    dir:string|undefined;
+    type:string;
+    crossorigin:string|undefined
+    quarylimit:number|undefined
     data:{[key:string]:Dbtable}
     constructor(type:string,path:string, dir:string, limit:number|undefined){
-        this.__type=type
-        this.__path=path
-        this.__dir=dir
-        this.__crossorigin=undefined
-        this.__quarylimit=limit
+        this.type=type
+        this.path=path
+        this.dir=dir
+        this.crossorigin=undefined
+        this.quarylimit=limit
         this.data = {}
 
+    }
+
+    public tablestring2table(table:string){
+        // this.sqlinjection(table)
+        if(!this.data[table]) throw(`[check_valid_table] table(${table}) 없어`)
+        return this.data[table]
+    }
+
+
+    public check_accessible_getoption(table:string,option:Getoption,keycheckfn:(arg0: string)=>string){ 
+        // join의 값들 유효성 확인
+        if (option.join) if(!option.join.getlist().every(val=>{
+            if(!option || !option.join) throw('뭔기 이상함');
+            this.check_accessible_attribute_with_dot(table,val,keycheckfn)
+            const [tablename, attributename] = option.join?.get(val)
+            this.tablestring2table(tablename).check_valid_table(1).check_accessible_attribute(1, attributename)
+        })) throw('option join 유효X')
+        
+        //as의 값들 유효성 확인
+        if (option.as) if(!option.as.getlist().every(val=>{
+            if(!option || !option.as) throw('뭔기 이상함');
+            this.check_accessible_attribute_with_dot(table,val,keycheckfn)
+            keycheckfn(option.as.get(val))
+        })) throw('option as 유효X')
+
+        if (!option.limit && this.quarylimit) option.limit = this.quarylimit
+        if (Number.isInteger(!option.limit)) throw('limit 잘못됨')
+
+        if(option.order){
+            this.check_accessible_attribute_with_dot(table,option.order.column,keycheckfn)
+            // if(!["ASC","DESC"].includes(option.order.order)) throw("opt oredr 잘못됨")
+        }
+    }
+
+    public check_accessible_attribute_with_dot(_table:string, _attribute:string,keycheckfn:(arg0: string)=>string){
+        if (!_table && !_attribute.includes('.')) throw('_attribute에 점이 없음')
+        if(_attribute.includes('.')){
+            const [tablename, attributename] = _attribute.split('.')
+            if(this.tablestring2table(tablename).check_accessible_attribute(1,keycheckfn(attributename))) return true
+            else false
+        }else if (this.tablestring2table(_table).check_accessible_attribute(1,keycheckfn(_attribute))) return true
+        else return false
     }
 }
 
@@ -72,17 +114,96 @@ export class Dbfile{
 // }
 
 export class Dbtable{
-    __name: string
-    __access:accesstype
+    name: string
+    access:accesstype
     data:{[key:string]:Dbattribute}
     constructor(name:string,access:accesstype){
-        this.__name = name
-        this.__access = access
+        this.name = name
+        this.access = access
         this.data = {}
     }
+    
+    public get_attribute( attributekey:string){
+    // if(attributekey.startsWith('__')) throw('attributename __로 시작'+attributekey)
+    if(!this.data[attributekey]) throw('attributename __로 시작'+attributekey)
+    // if(typeof _table.data[attributekey] != 'object') throw('_table[attributename] 객체아님'+attributekey)
+    return this.data[attributekey]
+    }
+
+    public is_unique_attribute(attribute:string[]){
+        
+        const __prkey_attribute = []
+        const __unique_attribute = []
+        for(const key in this.data) if(!key.startsWith('__')) {
+            const at = this.get_attribute(key)
+            if(at.primarykey ) __prkey_attribute.push(key)
+            if(at.unique) __unique_attribute.push(key)
+        }
+        
+        // 모든 prkey가 있으면 ok
+        if (__prkey_attribute.every(v=>attribute.includes(v))) return true
+
+        // 하나의 uniqukey가 있어도 ok
+        if(__unique_attribute.some(v=>attribute.includes(v))) return true
+
+        return false
+    }
+
+    public check_valid_table(accesstype:number){
+        // if(table.startsWith('__') ) throw('[check_valid_table] table __로 시작')
+        // if( !this.file.data[table]) throw(`[check_valid_table] table(${table}) 없어`)
+        // if(typeof this.file.data[table] != 'object') throw('this.file[table] 객체아님')
+        // const _table = this.file.data[table]
+        if(!this.access || this.access[accesstype] != 'all') throw('[check_valid_table] 권한 없음 '+this)
+        return this
+    }
+
+    public check_modifiable_attribute(accesstype:number,attributename:string,value:any){
+        // 접근할 수 있는지 체크
+        const _attribute = this.check_accessible_attribute(accesstype,attributename)
+
+        //notnull 체크
+        if(value==null && _attribute.notnull) throw('notnull error'+attributename)
+        
+        // __autoincrement 체크
+        if( _attribute.autoincrement) throw('__autoincrement error'+attributename)
+
+        //filiter체크
+        if(_attribute.filiter) if(!_attribute.filiter.test(String(value))) throw('_attribute.__filiter 만족 x '+_attribute.filiter)
+        return _attribute
+    }
+
+    public check_accessible_attribute(accesstype:number,attributename:string){
+        const _attribute = this.get_attribute(attributename)// _table[attributename]  as dbattribute
+        //권한체크
+        if(_attribute.access[1] != 'all') throw('권한 없음')
+        return _attribute
+    }
+    
+    public check_getattribute(attribute:Getattribute, keycheckfn:(arg0: string)=>string, typecheckfn:(arg0: string, arg1:any)=>boolean):[string[],stringobj]{
+        const attribute_array:string[] = []
+        const sql_dict:stringobj = {}
+        for(const key of attribute.getlist()){
+            keycheckfn(key) // 표준보다 강력해지는것(?) 안 하면 골치아프다.
+            const at =  this.check_accessible_attribute(1,key)
+            typecheckfn(at.type,attribute.get(key))
+            attribute_array.push(key)
+            sql_dict['$'+key] = attribute.get(key)
+        } 
+        return [attribute_array,sql_dict]
+    }
+
+    public check_getattribute_where(attribute:Getattribute, unique:boolean, keycheckfn:(arg0: string)=>string, typecheckfn:(arg0: string, arg1:any)=>boolean):[string[], stringobj]{
+        // const _table = this.tablestring2table(table)
+        const [attribute_array,sql_dict] = this.check_getattribute(attribute,keycheckfn,typecheckfn)
+        if(unique) if(!this.is_unique_attribute(attribute_array)) throw(`check_getattribute_where error table:${this} attribute:${attribute}`)
+        return [attribute_array,sql_dict]
+    }
+    
+
 }
 
-export type dbattribute = {
+type dbattribute = {
     __name:string,
     __access:accesstype,
     __type:string,
@@ -172,14 +293,6 @@ export class Dbattribute{
     this.filiter=option.__filiter
 }
 }
-
-export function get_attribute_from_table(_table:Dbtable, attributekey:string){
-    // if(attributekey.startsWith('__')) throw('attributename __로 시작'+attributekey)
-    if(!_table.data[attributekey]) throw('attributename __로 시작'+attributekey)
-    // if(typeof _table.data[attributekey] != 'object') throw('_table[attributename] 객체아님'+attributekey)
-    return _table.data[attributekey]
-}
-
 
 // export type getoption = {join:undefined|getjoin, as:getas|undefined, limit:undefined|null|number, order:undefined|getorder}
 

@@ -28,11 +28,11 @@ function main(setting) {
         // db에 
         (0, http_1.createServer)((req, res) => __awaiter(this, void 0, void 0, function* () {
             try {
-                if (req.url == undefined)
+                if (req.url === undefined)
                     throw ("url이 undefined");
-                if (req.headers.host == undefined)
+                if (req.headers.host === undefined)
                     throw ("host가 undefined");
-                if (req.method == undefined)
+                if (req.method === undefined)
                     throw ("method가 undefined");
                 // const url = req.url
                 // const host = req.headers.host

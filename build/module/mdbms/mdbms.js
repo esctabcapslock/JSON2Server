@@ -29,7 +29,7 @@ class MBDMS {
                 else
                     continue;
             }
-            const file = setting[key];
+            const file = setting[key]; // as dbfile
             if (typeof file.__type != 'string')
                 throw (`[__tpye string 아님, file.__type:${file.__type}, key:${key}`);
             const __type = file.__type.toLocaleLowerCase();
@@ -62,7 +62,7 @@ class MBDMS {
         if (!['GET', 'POST', 'PUT', 'DELETE'].includes(method))
             return false;
         for (const file in this.dbmses) {
-            if (this.dbmses[file].path == (0, sort_functions_1.parse_pathname)(url.pathname))
+            if (this.dbmses[file].getpath == (0, sort_functions_1.parse_pathname)(url.pathname))
                 return file;
         }
         return false;
@@ -133,16 +133,16 @@ class MBDMS {
                     case 'GET':
                         if (!Array.isArray(attribute) || !(0, sort_functions_1.is_string_array)(attribute))
                             throw ('err attribure err');
-                        data = yield this.get(file, table, attribute, (0, mdbms_type_1.check_getoption)(option));
+                        data = yield this.get(file, table, attribute, where == null ? null : new mdbms_type_1.Getattribute(where), option == null ? null : new mdbms_type_1.Getoption(option));
                         break;
                     case 'POST':
-                        data = yield this.post(file, table, (0, mdbms_type_1.check_getattribute)(attribute));
+                        data = yield this.post(file, table, new mdbms_type_1.Getattribute(attribute));
                         break;
                     case 'PUT':
-                        data = yield this.put(file, table, (0, mdbms_type_1.check_getattribute)(attribute), (0, mdbms_type_1.check_getattribute)(where));
+                        data = yield this.put(file, table, new mdbms_type_1.Getattribute(attribute), new mdbms_type_1.Getattribute(where));
                         break;
                     case 'DELETE':
-                        data = yield this.delete(file, table, (0, mdbms_type_1.check_getattribute)(where));
+                        data = yield this.delete(file, table, new mdbms_type_1.Getattribute(where));
                         break;
                     default:
                         throw ('[err] parsehttp ' + method);
@@ -156,11 +156,11 @@ class MBDMS {
             }
         });
     }
-    get(file, table, attribute, option = null) {
+    get(file, table, attribute, where = null, option = null) {
         // this.setup()
         if (typeof this.dbmses[file] != 'object')
             throw ('[get] this.dbmses[file] != object');
-        return this.dbmses[file].get(table, attribute, option);
+        return this.dbmses[file].get(table, attribute, where, option);
     }
     //데이터 추가
     // public post(file:string,table:string,attribute:string, option:any|undefined){

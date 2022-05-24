@@ -8,7 +8,7 @@ function my_ip() {
     const addresses = [];
     for (const iname in interfaces) {
         const ifs = interfaces[iname];
-        if (ifs == undefined)
+        if (ifs === undefined)
             continue;
         for (const address of ifs) {
             if (address.family === 'IPv4' && !address.internal) {

@@ -20,15 +20,15 @@ class MDBMS_DB {
             throw ('[__tpye string 아님');
         const __path = (0, sort_functions_1.parse_connect_pathname)(path, file.__path ? file.__path : key);
         const __dir = (0, sort_functions_1.parse_connect_pathname)(dir, file.__dir ? file.__dir : key);
-        this.__path = __path;
-        this.__dir = __dir;
-        this.__quarylimit = file.__quarylimit;
-        this.file = (0, mdbms_type_1.create_dbfile)(file.__type, __path, __dir, file.__quarylimit);
-        (0, sort_functions_1.createpath)(this.__dir);
+        this.path = __path;
+        this.dir = __dir;
+        this.quarylimit = file.quarylimit;
+        this.file = new mdbms_type_1.Dbfile(file.__type, __path, __dir, file.quarylimit);
+        (0, sort_functions_1.createpath)(this.dir);
         this.parsesetting(file);
         this.setup();
     }
-    get path() { return this.__path; }
+    get getpath() { return this.path; }
     parsesetting(file) {
         function check___access(tmp) {
             if (!Array.isArray(tmp) || tmp.length != 4 || !tmp.every(v => (typeof v == 'string')))
@@ -56,13 +56,13 @@ class MDBMS_DB {
                 else
                     continue;
             }
-            const _talbe = file[key_table];
+            const _talbe = file[key_table]; // as dbtable
             if (typeof _talbe != 'object')
                 throw ('[parsesetting _talbe] 잘못된 객체' + _talbe);
             if (!check___access(_talbe.__access))
                 throw ('[parsesetting check___access] 잘못된 객체');
-            const _ctalbe = (0, mdbms_type_1.create_dbtable)(key_table, _talbe.__access);
-            _cfile[key_table] = _ctalbe;
+            const _ctalbe = new mdbms_type_1.Dbtable(key_table, _talbe.__access);
+            _cfile.data[key_table] = _ctalbe;
             for (const key_attribute in _talbe) {
                 if (key_attribute.startsWith('__')) {
                     if (!['__primarykey', '__autoincrement', '__notnull', '__access', '__type', '__unique', '__default', '__check', '__foreignkey'].includes(key_attribute))
@@ -70,7 +70,7 @@ class MDBMS_DB {
                     else
                         continue;
                 }
-                const _attribute = _talbe[key_attribute];
+                const _attribute = _talbe[key_attribute]; // as dbattribute
                 if (typeof _attribute != 'object')
                     throw ('[parsesetting _attribute] 잘못된 객체' + key_attribute + _attribute);
                 if (typeof _attribute.__name != 'string')
@@ -79,7 +79,7 @@ class MDBMS_DB {
                     throw ('[parsesetting check___access] 잘못된 객체' + _attribute.__access);
                 if (typeof _attribute.__type != 'string')
                     throw ('[parsesetting _attribute.__type] 잘못된 값');
-                _ctalbe[key_attribute] = (0, mdbms_type_1.create_dbattribute)(_attribute);
+                _ctalbe.data[key_attribute] = new mdbms_type_1.Dbattribute(_attribute);
                 // __name:string,__access:string[4],__type
             }
         }
@@ -99,7 +99,7 @@ class MDBMS_DB {
         });
     }
     //데이터 읽기
-    get(table, attribute, option = null) {
+    get(table, attribute, where = null, option = null) {
         return __awaiter(this, void 0, void 0, function* () {
             // this.setup()
             return [];

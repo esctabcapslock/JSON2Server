@@ -1,6 +1,6 @@
 import {sqlite3,Database} from 'sqlite3'
 import {MDBMS_DB} from './mdbms_db'
-import {Dbtable,Dbattribute,Getoption,Getattribute,sqlallout,get_attribute_from_table, stringobj} from './mdbms_type'
+import {Dbtable,Dbattribute,Getoption,Getattribute,sqlallout, stringobj} from './mdbms_type'
 import {check_string_array, is_string_array} from '../sort_functions'
 
 export class MDBMS_SQLite extends MDBMS_DB{
@@ -51,7 +51,7 @@ export class MDBMS_SQLite extends MDBMS_DB{
                 // 대충 다음 버전에서 사라질 수 있다는 뜻. 호환 부족함 
                //console.log('[table_info]',$tablename,table_info,)
             }
-            for(const tablename in this.file) if(!tablename.startsWith('__')){
+            for(const tablename in this.file.data) if(!tablename.startsWith('__')){
                 //console.log('[this.file[tablename]',tablename,this.file[tablename])
                 if(!exist_table_names.includes(tablename)){
                     const _table:Dbtable = this.file.data[tablename]
@@ -59,9 +59,9 @@ export class MDBMS_SQLite extends MDBMS_DB{
                     const create_sql_bytable = (tablename:string,table:Dbtable) =>{
                         let out = `CREATE TABLE "${this.sqlinjection(tablename)}"(\n`
                         const attribute_sql_list = []
-                        for(const attributename in table.data) if(!attributename.startsWith('__')){
+                        for(const attributename in table.data) {//if(!attributename.startsWith('__'))
                             console.log('[table[attributename]',attributename,table.data[attributename])
-                            attribute_sql_list.push(create_sql_by_attribute(attributename,get_attribute_from_table(table, attributename)))
+                            attribute_sql_list.push(create_sql_by_attribute(attributename,table.get_attribute(attributename)))
                         }
                         out += attribute_sql_list.join(',\n') + '\n)'
                         console.log('[create_sql_bytable]',out)
@@ -109,21 +109,22 @@ export class MDBMS_SQLite extends MDBMS_DB{
         // option  조건:
         //attribute에 있어야 함.
         if(!option) option = new Getoption({join:undefined,limit:undefined,as:undefined,order:undefined}) //{join:undefined,limit:undefined,as:undefined,order:undefined}
+        // 테이블 가능 확인
+        const _table = this.file.tablestring2table(table).check_valid_table(1)
         
         try{
-            // 테이블 가능 확인
-            this.check_valid_table(table,1)
+            
             // 속성을 요청했는지 확인
             if(!is_string_array(attribute) || attribute.length==0) throw(`table:${table} attribute 길이가 0이거나 배열이 아님`)
             // 접근 가능한 속성인지 확인
-            for (const val of attribute) this.check_accessible_attribute_with_dot(table,val) //) req_attribute.push(val)
-            // option
-            this.check_accessible_getoption(table,option)
+            for (const val of attribute) this.file.check_accessible_attribute_with_dot(table,val,this.sqlinjection) //) req_attribute.push(val)
+            // option 유효성 확인
+            this.file.check_accessible_getoption(table,option,this.sqlinjection)
         }catch(e){
             throw(`400 [sqlite db get] 요청사항의 문제. e:${e}`)
         }
 
-        const [where_array, where_sql_dict] = where!=null ? this.check_getattribute_where(table,where,false) : [[],{}];
+        const [where_array, where_sql_dict] = where!=null ? _table.check_getattribute_where(where,false,this.sqlinjection,this.check_type_attribute) : [[],{}];
 
         //sql문 생성
         let sql = `SELECT`
@@ -156,9 +157,9 @@ export class MDBMS_SQLite extends MDBMS_DB{
     }
     //데이터 추가
     public async post(table:string,attribute:Getattribute, option:null=null){
-        const _table = this.check_valid_table(table,1)
+        const _table = this.file.tablestring2table(table).check_valid_table(1)
 
-        const [attribute_array, attribute_dict] = this.check_getattribute(table,attribute)
+        const [attribute_array, attribute_dict] = _table.check_getattribute(attribute,this.sqlinjection,this.check_type_attribute)
 
         const sql = `INSERT INTO ${this.sqlinjection(table)}
                      (${attribute_array.join(', ')}) VALUES(${attribute_array.map(v=>`$`+v).join(',')});`
@@ -170,10 +171,10 @@ export class MDBMS_SQLite extends MDBMS_DB{
     }
     //데이터 수정
     public async put(table:string,attribute:Getattribute,where:Getattribute, option:null=null){
-       
-        const [where_array, sql_dict1] = this.check_getattribute_where(table,where,true)
-        const [attribute_array, sql_dict2] = this.check_getattribute(table,attribute)
+        const _table = this.file.tablestring2table(table).check_valid_table(1)
 
+        const [where_array, sql_dict1] = _table.check_getattribute_where(where,true,this.sqlinjection,this.check_type_attribute)
+        const [attribute_array, sql_dict2] = _table.check_getattribute(attribute,this.sqlinjection,this.check_type_attribute)
         // UPDATE table_name
         // SET column1 = value1, column2 = value2, ...
         // WHERE condition; 
@@ -187,9 +188,12 @@ export class MDBMS_SQLite extends MDBMS_DB{
     }
     //데이터 삭제
     public async delete(table:string,where:Getattribute, option:null=null){
-        const [where_array, sql_dict] = this.check_getattribute_where(table,where,true)
+        const _table = this.file.tablestring2table(table).check_valid_table(1)
 
-        if(!this.is_unique_attribute(table,where_array)) throw('[delete] error')
+        const [where_array, sql_dict] = _table.check_getattribute_where(where,true,this.sqlinjection,this.check_type_attribute)
+        const __table = this.file.tablestring2table(table).check_valid_table(1)
+
+        if(!__table.is_unique_attribute(where_array)) throw('[delete] error')
         const sql = `DELETE FROM ${this.sqlinjection(table)}
                      WHERE ${where_array.map(v=>`${v}=$${v}`).join(' AND ')}` // 등호 1개 맞음
         const insert_out = await this.getdb(sql,sql_dict)
@@ -203,52 +207,7 @@ export class MDBMS_SQLite extends MDBMS_DB{
         return str
     }
     
-    private check_valid_table(table:string,accesstype:number){
-        this.sqlinjection(table)
-        // if(table.startsWith('__') ) throw('[check_valid_table] table __로 시작')
-        if( !this.file.data[table]) throw(`[check_valid_table] table(${table}) 없어`)
-        // if(typeof this.file.data[table] != 'object') throw('this.file[table] 객체아님')
-        const _table = this.file.data[table]
-        if(!_table.__access || _table.__access[accesstype] != 'all') throw('[check_valid_table] 권한 없음 '+_table)
-        return _table
-    }
-    private check_modifiable_attribute(_table:Dbtable|string,accesstype:number,attributename:string,value:any){
-        // 접근할 수 있는지 체크
-        const _attribute = this.check_accessible_attribute(_table,accesstype,attributename)
-
-        //notnull 체크
-        if(value==null && _attribute.notnull) throw('notnull error'+attributename)
-        
-        // __autoincrement 체크
-        if( _attribute.autoincrement) throw('__autoincrement error'+attributename)
-
-        //filiter체크
-        if(_attribute.filiter) if(!_attribute.filiter.test(String(value))) throw('_attribute.__filiter 만족 x '+_attribute.filiter)
-        return _attribute
-    }
-    private check_accessible_attribute(_table:Dbtable|string, accesstype:number,attributename:string){
-        this.sqlinjection(attributename)
-        if(typeof _table =='string') _table = this.check_valid_table(_table, accesstype)
-
-        // if(attributename.startsWith('__')) throw('attributename __로 시작'+attributename)
-        // if(!_table[attributename]) throw('attributename __로 시작'+attributename)
-        // if(typeof _table[attributename] != 'object') throw('_table[attributename] 객체아님'+attributename)
-        const _attribute = get_attribute_from_table(_table, attributename)// _table[attributename]  as dbattribute
-
-        //권한체크
-        if(_attribute.access[1] != 'all') throw('권한 없음')
-        return _attribute
-    }
-    // _table 과 _attribute 따루 주거나, _table 무시하고 _attribute가 [문자].[문자]형식일 떄,
-    private check_accessible_attribute_with_dot(_table:string, _attribute:string){
-        if (!_table && !_attribute.includes('.')) throw('_attribute에 점이 없음')
-        if(_attribute.includes('.')){
-            const [tablename, attributename] = _attribute.split('.')
-            if(this.check_accessible_attribute(this.sqlinjection(tablename),1,this.sqlinjection(attributename))) return true
-            else false
-        }else if (this.check_accessible_attribute(_table,1,this.sqlinjection(_attribute))) return true
-        else return false
-    }
+    
     private check_type_attribute(type:string,value:any){
         if (type == 'INTEGER') {if(!Number.isInteger(value)&&value!=null) throw('type error INTEGER '+value+', '+type)}
         else if (type == 'TEXT') {if(!['string','null'].includes(typeof value)) throw('type error string '+value+', '+type)}
@@ -257,75 +216,5 @@ export class MDBMS_SQLite extends MDBMS_DB{
         
         return true
         // if (_attribute.__type.toUpperCase() == 'NUMERIC') if(!['number','null'].includes(typeof attribute[attributename])) throw('type error INTEGER'+attributename)
-    }
-
-    private is_unique_attribute(_table:string|Dbtable, attribute:string[]){
-        if(typeof _table =='string') _table = this.check_valid_table(_table, 1)
-        const __table = _table
-        // __primarykey 이거나 _unique 속성이 먹여야
-        // __unique
-        
-        const __prkey_attribute = []
-        const __unique_attribute = []
-        for(const key in __table) if(!key.startsWith('__')) {
-            const at = get_attribute_from_table(__table, key)
-            if(at.primarykey ) __prkey_attribute.push(key)
-            if(at.unique) __unique_attribute.push(key)
-        }
-        
-        // 모든 prkey가 있으면 ok
-        if (__prkey_attribute.every(v=>attribute.includes(v))) return true
-
-        // 하나의 uniqukey가 있어도 ok
-        if(__unique_attribute.some(v=>attribute.includes(v))) return true
-
-        return false
-    }
-    
-    // 유효간 속성인지 확인
-    private check_getattribute(table:string, attribute:Getattribute):[string[], stringobj]{
-        const attribute_array:string[] = []
-        const sql_dict:stringobj = {}
-        for(const key of attribute.getlist()){
-            this.sqlinjection(key) // 표준보다 강력해지는것(?) 안 하면 골치아프다.
-            const at =  this.check_accessible_attribute (table,1,key)
-            this.check_type_attribute(at.type,attribute.get(key))
-            attribute_array.push(key)
-            sql_dict['$'+key] = attribute.get(key)
-        } 
-        return [attribute_array,sql_dict]
-    }
-
-    // check_getattribute 실행하고, attribute가 단 하나의 래코드를 가리키는지 확인
-    // sql whehe문에 사용하기 위한거임
-    private check_getattribute_where(table:string, attribute:Getattribute, unique:boolean):[string[], stringobj]{
-        const [attribute_array,sql_dict] = this.check_getattribute(table,attribute)
-        if(unique) if(!this.is_unique_attribute(table,attribute_array)) throw(`check_getattribute_where error table:${table} attribute:${attribute}`)
-        return [attribute_array,sql_dict]
-    }
-    private check_accessible_getoption(table:string,option:Getoption){ 
-        // join의 값들 유효성 확인
-        if (option.join) if(!option.join.getlist().every(val=>{
-            if(!option || !option.join) throw('뭔기 이상함');
-            this.check_accessible_attribute_with_dot(table,val)
-            const [tablename, attributename] = option.join?.get(val)
-            this.check_valid_table(tablename, 1)
-            this.check_accessible_attribute(tablename, 1, attributename)
-        })) throw('option join 유효X')
-        
-        //as의 값들 유효성 확인
-        if (option.as) if(!option.as.getlist().every(val=>{
-            if(!option || !option.as) throw('뭔기 이상함');
-            this.check_accessible_attribute_with_dot(table,val)
-            this.sqlinjection(option.as.get(val))
-        })) throw('option as 유효X')
-
-        if (!option.limit && this.quarylimit) option.limit = this.quarylimit
-        if (Number.isInteger(!option.limit)) throw('limit 잘못됨')
-
-        if(option.order){
-            this.check_accessible_attribute_with_dot(table,option.order.column)
-            // if(!["ASC","DESC"].includes(option.order.order)) throw("opt oredr 잘못됨")
-        }
     }
 }
